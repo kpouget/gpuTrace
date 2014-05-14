@@ -1,0 +1,28 @@
+sed -i 's/cuda_kernel/kernel_cuda/g' head_cuda.out
+sed -i 's/kernel|/kernel_cuda|/g' head_cuda.out
+sed -i 's/cuda_device/kernel_cuda/g' head_cuda.out
+    
+sed -i 's/multiply/update/g' head_cuda.out
+
+sed -i 's/UpdateDispVeloc/update_disp_veloc/g' head_cuda.out
+sed -i 's/UpdatePotential/update_potential/g' head_cuda.out
+
+sed -i 's/compute_kernels/compute/g' head_cuda.out
+sed -i 's/_cudakernel_/_kernel_/g' head_cuda.out
+
+sed -i 's/Kernel_2_//g' head_cuda.out
+sed -i 's/impl|/impl_kernel_cuda|/g' head_cuda.out
+    
+sed -i 's/_element_/_element_NOPE NOPE NOPE/g' head_cuda.out
+
+sed -i 's/compute_strain_product_cuda|/compute_acoustic_kernel_cuda|/g' head_cuda.out
+sed -i 's/compute_gradient_kernel_cuda|/compute_acoustic_kernel_cuda|/g' head_cuda.out
+
+sed -i 's/_cuda|/|/g' head_cuda.out
+    
+sed -i 's/|//g' head_cuda.out
+
+sed -i 's/impl<1>/impl_kernel_forward/g' head_cuda.out
+sed -i 's/impl<3>/impl_kernel_adjoint/g' head_cuda.out
+
+sed -i 's/const //g' head_cuda.out
