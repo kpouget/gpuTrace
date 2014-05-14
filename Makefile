@@ -1,5 +1,7 @@
 CWD_DIR := $(shell pwd)
 
+MPI_INC := -I/usr/include/openmpi-x86_64/
+
 OCL_SO_NAME := ldChecker-ocl.so
 CUDA_SO_NAME := ldChecker-cuda.so
 
@@ -9,7 +11,7 @@ PY_LDFLAGS := $(python3-config --ldflags)
 SO_CFLAGS := -fPIC 
 SO_LDFLAGS := -fPIC -rdynamic -shared  $(PY_LDFLAGS) 
 
-CFLAGS := -g -O0 -std=gnu99 -Werror -Wall -pedantic -Wno-format-security
+CFLAGS := -g -O0 -std=gnu99 -Werror -Wall -pedantic -Wno-format-security $(MPI_INC)
 
 OCL_LD_PRELOAD_ENV := LD_PRELOAD=$(CWD_DIR)/$(OCL_SO_NAME):libpython3.3m.so
 CUDA_LD_PRELOAD_ENV := LD_PRELOAD=$(CWD_DIR)/$(CUDA_SO_NAME)
@@ -38,6 +40,7 @@ clean : clean-cuda clean-python
 clean-python : 
 	rm -rf __pycache__
 
+MPI_RUN = # mpirun -n 6 -x
 ### OCL example ###
 
 SERGE_OCL_DIR := ~/travail/sample/OpenCL/Apriori_GPU/
@@ -46,11 +49,11 @@ SERGE_OCL_APPLI := ./AprioriPBI src/chess.dat 3000
 SPECFEM_OCL_DIR := /home/kevin/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
 SPECFEM_OCL_APPLI := bin/xspecfem3D
 
-OCL_DIR := $(SPECFEM_OCL_DIR)
-OCL_APPLI := $(SPECFEM_OCL_APPLI)
+OCL_DIR := $(SERGE_OCL_DIR)
+OCL_APPLI := $(SERGE_OCL_APPLI)
 
 run_ocl : $(OCL_SO_NAME)
-	cd $(OCL_DIR) && mpirun -n 6 -x $(OCL_LD_PRELOAD_ENV) $(OCL_APPLI) || echo "Failed"
+	cd $(OCL_DIR) && $(MPI_RUN) $(OCL_LD_PRELOAD_ENV) $(OCL_APPLI) || echo "Failed"
 
 debug_ocl : $(OCL_SO_NAME)
 	cd $(OCL_DIR) && gdb -ex 'set environment $(OCL_LD_PRELOAD_ENV)' --args $(OCL_APPLI)
@@ -101,7 +104,7 @@ hello : hello.cu
 	$(NVCC) $(CUDA_EXAMPLE_CFLAGS) $< -o $@ $(NV_INSTR)
 
 run_cuda : $(CUDA_SO_NAME)
-	cd $(CUDA_DIR) && mpirun -n 6 -x $(CUDA_LD_PRELOAD_ENV) $(CUDA_APPLI) || echo "Failed"
+	cd $(CUDA_DIR) && $(MPI_RUN) $(CUDA_LD_PRELOAD_ENV) $(CUDA_APPLI) || echo "Failed"
 
 debug_cuda : $(CUDA_SO_NAME)
 	cd $(CUDA_DIR) && gdb -ex 'set environment $(CUDA_LD_PRELOAD_ENV)' --args $(CUDA_APPLI)

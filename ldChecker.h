@@ -12,18 +12,20 @@
 #define PRINT_KERNEL_BEFORE_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST 0
-#define PRINT_KERNEL_NAME_ONLY 1
+#define PRINT_KERNEL_NAME_ONLY 0
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 0
-#define FULL_BUFFER_SIZE_LIMIT 0
+#define PRINT_KERNEL_ARG_FULL_BUFFER 1
+#define FULL_BUFFER_SIZE_LIMIT 750
+#define PRINT_FULL_PARAMS_TO_FILE 1
 
 #define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 0
 
 #define BUFFER_ZERO_IS_NULL 1
 
-#define ONLY_MPI_ROOT_OUTPUT 1
-
 #define FORCE_FINISH_KERNEL 0
+
+#define WITH_MPI 0
+#define ONLY_MPI_ROOT_OUTPUT 1
 
 typedef int ld_flags;
 
@@ -44,11 +46,6 @@ enum type_info_type_e {
   TYPE_INFO_UINT
 };
 
-enum buffer_state_e {
-  BUFFER_ST_PENDING,
-  BUFFER_ST_STILL
-};
-
 extern struct type_info_s {
   const char *type_name;
   const char *format;
@@ -67,8 +64,6 @@ struct ld_mem_s {
   int has_values;
   int values_outdated;
   int released;
-  enum buffer_state_e state;
-  int pending_queue;
   char first_values[FIRST_BYTES_TO_READ];
 };
 
@@ -83,6 +78,7 @@ struct ld_kern_param_s {
   size_t offset;
   
   char current_value[CURRENT_VALUE_BUFFER_SZ];
+  char current_binary_value[10];
 };
 
 struct ld_kernel_s {
@@ -220,14 +216,6 @@ void kernel_executed_event(struct ld_kernel_s *kernel,
 void kernel_finished_event(struct ld_kernel_s *ldKernel,
                            const struct work_size_s *work_sizes,
                            int work_dim);
-/** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
-
-int new_queue (void);
-void buffer_set_pending (struct ld_mem_s *ldBuffer, int queue);
-void buffer_set_still (struct ld_mem_s *ldBuffer);
-void kernel_args_pending (struct ld_kernel_s *ldKernel);
-void queue_flushed (int queue);
-
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
 
 static inline const struct type_info_s *get_type_info (const char *type_name) {

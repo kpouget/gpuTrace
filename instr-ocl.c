@@ -129,7 +129,6 @@ cl_command_queue clCreateCommandQueue(cl_context context,
 }
 
 cl_int clFinish (cl_command_queue command_queue) {
-  queue_flushed (...);
   return real_clFinish(command_queue);
 }
 
@@ -172,9 +171,6 @@ struct ld_mem_s *create_ocl_buffer(cl_mem handle) {
 
   ldBuffer->handle = handle;
   ldBuffer->uid = buffer_uid++;
-  
-  ldBuffer->state = BUFFER_ST_COMMITED;
-  ldBuffer->pending_queue = -1;
   
   return ldBuffer;
 }
@@ -372,20 +368,19 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                         global_work_offset, global_work_size,
                                         local_work_size, num_events_in_wait_list,
                                         event_wait_list, event);
-  kernel_args_pending (ldKernel);
 
 #if FORCE_FINISH_KERNEL
   real_clFinish(command_queue);
-  kernel_finished_event(ldKernel, &work_sizes, work_dim);
 #endif
+
+  kernel_finished_event(ldKernel, &work_sizes, work_dim);
   
   return errcode;
 }
 
 /* ************************************************************************* */
 
-struct ld_mem_s *readWriteMemory(cl_command_queue command_queue,
-                                 cl_mem buffer, void **ptr, int direction,
+struct ld_mem_s *readWriteMemory(cl_mem buffer, void **ptr, int direction,
                                  size_t size, size_t offset)
 {
   struct ld_mem_s *ldBuffer = find_mem_entry(buffer);
@@ -401,7 +396,6 @@ struct ld_mem_s *readWriteMemory(cl_command_queue command_queue,
 
   assert(ldBuffer);
 
-  buffer_set_pending(ldBuffer);
   buffer_copy_event(ldBuffer, direction, (void **) ptr, size, real_offset);
 
   return ldBuffer;
@@ -417,18 +411,11 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue,
                              const cl_event *event_wait_list,
                              cl_event *event)
 {
-  cl_int ret;
+  readWriteMemory(buffer, (void **) ptr, LD_WRITE, size, offset);
   
-  struct ld_mem_s *ldBuffer = readWriteMemory(buffer, (void **) ptr, LD_WRITE, size, offset);
-  
-  ret = real_clEnqueueWriteBuffer(command_queue, buffer, CL_TRUE /* blocking_write */,
-                                  offset, size, ptr, num_events_in_wait_list,
-                                  event_wait_list, event);
-  if (blocking_write) {
-    buffer_set_still (ldBuffer);
-  }
-  
-  return ret;
+  return real_clEnqueueWriteBuffer(command_queue, buffer, CL_TRUE /* blocking_write */,
+                                   offset, size, ptr, num_events_in_wait_list,
+                                   event_wait_list, event);
 }
 
 /* ************************************************************************* */
@@ -444,17 +431,13 @@ cl_int clEnqueueReadBuffer (cl_command_queue command_queue,
                             cl_event *event)
 {
   cl_int errcode;
-  struct ld_mem_s *ldBuffer;
   
   errcode = real_clEnqueueReadBuffer(command_queue, buffer, CL_TRUE /* blocking_read */,
                                      offset, size, ptr, num_events_in_wait_list,
                                      event_wait_list, event);
 
-  ldBuffer = readWriteMemory(buffer, ptr, LD_READ, size, offset);
-
-  if (blocking_read) {
-    buffer_set_still (ldBuffer);
-  }
+  readWriteMemory(buffer, ptr, LD_READ, size, offset);
+  
   
   return errcode;
 }

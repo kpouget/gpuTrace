@@ -13,7 +13,7 @@ void init_helper(void) {
   Py_Initialize();
   PySys_SetPath(
     //L"/home/kevin/travail/sample/cl-specfem3d/SPECFEM3D_GLOBE/ldChecker"
-    L"/home/kevin/cl-specfem3d/SPECFEM3D_GLOBE/ldChecker"
+    L"/home/kevin/travail/sample/gpuTrace"
     );
   
   pModule = PyImport_ImportModule(FILENAME);

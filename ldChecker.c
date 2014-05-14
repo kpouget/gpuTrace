@@ -1,14 +1,20 @@
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include "ldChecker.h"
 
 #define __USE_GNU
 #include <dlfcn.h>
 
+#define SET_PARAM_FILE_NAME(__kern__, __param__, __out__, __str__)      \
+  sprintf(__str__, "%s.%s.%s",                                          \
+          __kern__->name, __param__->name,                              \
+          __out__ ? "out" : "in")
+
 #define MAX_LEN_ONE_NUMBER 16
 
-#if ONLY_MPI_ROOT_OUTPUT == 1
+#if WITH_MPI == 1 && ONLY_MPI_ROOT_OUTPUT == 1
 #define CHECK_MPI_ROOT_OUTPUT()      \
   if (myrank != -1 && myrank != 0) { \
     return;                          \
@@ -26,11 +32,15 @@ struct type_info_s TYPE_FORMATTERS[] = {
   {NULL, "%p", sizeof(void *),  TYPE_INFO_DEFAULT} /* default */
 };
 
+#if WITH_MPI == 1
 #include <mpi.h>
 int (*real_MPI_Comm_rank)(MPI_Comm comm, int *rank);
+#endif
 
 struct ld_bindings_s ld_bindings[] = {
+#if WITH_MPI == 1
   {"MPI_Comm_rank", (void **) &real_MPI_Comm_rank},
+#endif
   {NULL, NULL}
 };
 
@@ -74,6 +84,7 @@ void init_ldchecker(struct callback_s callbacks, struct ld_bindings_s *lib_bindi
   inited = 1;
 }
 
+#if WITH_MPI == 1
 int myrank = -1;
 int MPI_Comm_rank(MPI_Comm comm, int *rank) {
   local_init_ldchecker();
@@ -84,7 +95,7 @@ int MPI_Comm_rank(MPI_Comm comm, int *rank) {
 
   return ret;
 }
-
+#endif
 
 void subbuffer_created_event(struct ld_mem_s *buffer, size_t offset) {
 #if PRINT_KERNEL_BUFFER_CREATION == 1
@@ -145,6 +156,7 @@ static void kernel_set_arg_event (struct ld_kernel_s *ldKernel,
     warning("current value already set (%s#%d)\n",
             ldKernel->name, arg_index);
   }
+  
   ldParam->has_current_value = 1;
 
 }
@@ -199,6 +211,8 @@ void kernel_set_scalar_arg_event (struct ld_kernel_s *ldKernel,
   } else {
     snprintf(value, BVALUE_SIZE, ldParam->type_info->format, *arg_value);
   }
+
+  memcpy (ldParam->current_binary_value, arg_value, ldParam->type_info->size);
   
   arg_to_param_value(value, ldParam);
   
@@ -242,8 +256,30 @@ char *print_a_number (const char *ptr, const struct type_info_s *type_info) {
   return value;
 }
 
-void print_full_buffer(struct ld_mem_s *ldBuffer,
-                       const struct type_info_s *type_info)
+void print_scalar_param_to_file (struct ld_kernel_s *ldKernel,
+                                 struct ld_kern_param_s *ldParam)
+{
+  static char filename[80];
+  FILE *fp;
+  
+  SET_PARAM_FILE_NAME(ldKernel, ldParam, 0, filename);
+  fp = fopen(filename, "w");
+  
+  if (!fp) {
+    perror("Failed to open file:");
+    error("Failure with file %s", filename);
+  }
+
+  fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+
+  fclose (fp);
+}
+
+void print_full_buffer(struct ld_kernel_s *ldKernel,
+                       struct ld_kern_param_s *ldParam,
+                       struct ld_mem_s *ldBuffer,
+                       const struct type_info_s *type_info,
+                       int finish)
 {
   size_t size = ldBuffer->size; /* maybe get size of written data ?  */
   size_t tsize = type_info->size;
@@ -275,17 +311,37 @@ void print_full_buffer(struct ld_mem_s *ldBuffer,
 
     goto finish;
   }
+
+#if PRINT_FULL_PARAMS_TO_FILE == 1
+  static char filename[80];
+  SET_PARAM_FILE_NAME(ldKernel, ldParam, finish, filename);
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    perror("Failed to open file:");
+    error("Failure with file %s", filename);
+  }
+#else
+  gpu_trace("\n");
+#endif
   
   ptr = (char *) buffer;
   while (bytes_written < size) {
+#if PRINT_FULL_PARAMS_TO_FILE == 1
+    fwrite (ptr, tsize, 1, fp);
+#else
     gpu_trace(print_a_number (ptr, type_info));
+    gpu_trace(" ");
+#endif
     
     ptr += tsize;
     bytes_written += tsize;
-    gpu_trace(" ");
   }
 
- finish:
+#if PRINT_FULL_PARAMS_TO_FILE == 1
+  fclose (fp);
+#endif
+  
+finish:
   free(buffer);
 }
 
@@ -322,6 +378,7 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
     }
     gpu_trace("(");
   }
+  
 #if PRINT_KERNEL_NAME_ONLY == 1
   if (!finish) {
     gpu_trace(");\n");
@@ -335,11 +392,10 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
   
   for (i = 0; i < ldKernel->nb_params; i++) {
 #if PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST != 1
-    if (!ldKernel->params[i].type_info->type_name)
-      continue;
     if (finish
-        && (strstr(ldKernel->params[i].type_info->type_name, "const ") == NULL
-            || !ldKernel->params[i].is_pointer))
+        && (!ldKernel->params[i].is_pointer // (it's a scalar)
+            || strstr(ldKernel->params[i].type_info->type_name, "const ") != NULL // (it's a const buffer)
+             ))
     {
       continue;
     }
@@ -361,10 +417,16 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
     }
 #if PRINT_KERNEL_ARG_FULL_BUFFER
     if (ldKernel->params[i].is_pointer) {
-      gpu_trace("\n");
-      print_full_buffer(ldKernel->params[i].current_buffer,
-                        ldKernel->params[i].type_info);
+      print_full_buffer(ldKernel, &ldKernel->params[i],
+                        ldKernel->params[i].current_buffer,
+                        ldKernel->params[i].type_info,
+                        finish);
     }
+#if PRINT_FULL_PARAMS_TO_FILE == 1
+    else if (!finish){
+      print_scalar_param_to_file (ldKernel, &ldKernel->params[i]);
+    }
+#endif
 #endif
   }
   if (finish) {
@@ -402,7 +464,6 @@ void kernel_finished_event(struct ld_kernel_s *ldKernel,
   for (i = 0; i < ldKernel->nb_params; i++) {
     ldKernel->params[i].has_current_value = 0;
   }
-  
 }
 
 void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
@@ -582,7 +643,7 @@ void error(const char *format, ...) {
   va_end(args);
   
   dbg_crash_event();
-  while(1);
+
   exit(1);
 }
 
