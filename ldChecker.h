@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
+/******************************
+ * Select what and when info 
+ * are traced.
+ ******************************/
+
 #define PRINT_KERNEL_BUFFER_CREATION 0
 #define PRINT_BUFFER_DIRECTION 0
 #define PRINT_BUFFER_TRANSFER 0
@@ -12,11 +17,7 @@
 #define PRINT_KERNEL_BEFORE_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST 0
-#define PRINT_KERNEL_NAME_ONLY 0
-
-#define PRINT_KERNEL_ARG_FULL_BUFFER 1
-#define FULL_BUFFER_SIZE_LIMIT 750
-#define PRINT_FULL_PARAMS_TO_FILE 1
+#define PRINT_KERNEL_NAME_ONLY 1
 
 #define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 0
 
@@ -24,8 +25,31 @@
 
 #define FORCE_FINISH_KERNEL 0
 
+/******************************
+ * Print full buffers to screen
+ * or into a file.                   
+ ******************************/
+
+#define PRINT_KERNEL_ARG_FULL_BUFFER 0
+#define FULL_BUFFER_SIZE_LIMIT 750
+#define PRINT_FULL_PARAMS_TO_FILE 0
+
+/******************************
+ * MPI support                
+ ******************************/
+
 #define WITH_MPI 0
 #define ONLY_MPI_ROOT_OUTPUT 1
+
+/******************************
+ * Execution profiling
+ ******************************/
+
+#define ENABLE_KERNEL_PROFILING 1
+
+/******************************
+ ******************************
+ ******************************/
 
 typedef int ld_flags;
 
@@ -87,6 +111,9 @@ struct ld_kernel_s {
   const char *name;
   struct ld_kern_param_s *params;
   unsigned int exec_counter;
+#if ENABLE_KERNEL_PROFILING == 1
+  unsigned long int exec_span;
+#endif
 };
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/

@@ -15,12 +15,14 @@
 #define MAX_LEN_ONE_NUMBER 16
 
 #if WITH_MPI == 1 && ONLY_MPI_ROOT_OUTPUT == 1
-#define CHECK_MPI_ROOT_OUTPUT()      \
+#define ONLY_MPI_MASTER()      \
   if (myrank != -1 && myrank != 0) { \
     return;                          \
   }
+#define IS_MPI_MASTER() myrank != -1 && myrank != 0
 #else
-#define CHECK_MPI_ROOT_OUTPUT()
+#define ONLY_MPI_MASTER()
+#define IS_MPI_MASTER()
 #endif
 
 struct type_info_s TYPE_FORMATTERS[] = {
@@ -144,6 +146,9 @@ void kernel_created_event(struct ld_kernel_s *ldKernel) {
   }
 
   ldKernel->exec_counter = 0;
+#if ENABLE_KERNEL_PROFILING == 1
+  ldKernel->exec_span = 0;
+#endif
 }
 
 
@@ -596,7 +601,7 @@ void buffer_released (struct ld_mem_s *ldBuffer) {
 void debug(const char *format, ...) {
   va_list args;
 
-  CHECK_MPI_ROOT_OUTPUT();
+  ONLY_MPI_MASTER();
   
   va_start(args, format);
 
@@ -609,7 +614,7 @@ void debug(const char *format, ...) {
 void info(const char *format, ...) {
   va_list args;
 
-  CHECK_MPI_ROOT_OUTPUT();
+  ONLY_MPI_MASTER();
   
   va_start(args, format);
 
@@ -622,7 +627,7 @@ void info(const char *format, ...) {
 void warning(const char *format, ...) {
   va_list args;
 
-  CHECK_MPI_ROOT_OUTPUT();
+  ONLY_MPI_MASTER();
   
   va_start(args, format);
 
@@ -650,7 +655,7 @@ void error(const char *format, ...) {
 void gpu_info(const char *format, ...) {
   va_list args;
 
-  CHECK_MPI_ROOT_OUTPUT();
+  ONLY_MPI_MASTER();
   
   va_start(args, format);
   
@@ -662,7 +667,7 @@ void gpu_info(const char *format, ...) {
 void gpu_trace(const char *format, ...) {
   va_list args;
 
-  CHECK_MPI_ROOT_OUTPUT();
+  ONLY_MPI_MASTER();
   
   va_start(args, format);
   

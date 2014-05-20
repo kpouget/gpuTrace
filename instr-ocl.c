@@ -120,6 +120,10 @@ cl_command_queue clCreateCommandQueue(cl_context context,
                                       cl_int *errcode_ret)
 {
   init_ocl_ldchecker();
+
+#if ENABLE_KERNEL_PROFILING == 1
+  properties |=  CL_QUEUE_PROFILING_ENABLE;
+#endif
   
   ldOclEnv.command_queue = real_clCreateCommandQueue(context, device,
                                                      properties, errcode_ret);
@@ -133,8 +137,27 @@ cl_int clFinish (cl_command_queue command_queue) {
 }
 
 cl_int clReleaseCommandQueue (cl_command_queue command_queue) {
-  return real_clReleaseCommandQueue (command_queue);
 
+#if ENABLE_KERNEL_PROFILING == 1
+  if (IS_MPI_MASTER()) {
+    int i;
+    
+    for (i = 0; i < kernel_elt_count; i++) {
+      struct ld_kernel_s *ldKernel = &kernel_map[i];
+      
+      info("Kernel %s was executed %d times.\n", ldKernel->name, ldKernel->exec_counter);
+      
+      if (ldKernel->exec_counter == 0) {
+        continue;
+      }
+      
+      info("\t- it took %uns.\n", ldKernel->exec_span);
+      info("\t- that's an average of %uns.\n", ldKernel->exec_span / ldKernel->exec_counter);
+    }
+  }
+#endif
+  
+  return real_clReleaseCommandQueue (command_queue);
 }
 /* ************************************************************************* */
 
@@ -340,6 +363,21 @@ cl_int clSetKernelArg (cl_kernel kernel,
 
 /* ************************************************************************* */
 
+#if ENABLE_KERNEL_PROFILING == 1
+static void CL_CALLBACK  kernel_profiler_cb (cl_event event,
+                                             cl_int event_command_exec_status,
+                                             void *user_data)
+{
+  static cl_ulong tstart, tstop, len;
+  
+  struct ld_kernel_s *ldKernel = (struct ld_kernel_s *) user_data;
+  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(tstart), &tstart, NULL);
+  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(tstop), &tstop, NULL);
+  len = tstop - tstart;
+  ldKernel->exec_span += len;
+}
+#endif
+
 cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                cl_kernel kernel,
                                cl_uint work_dim,
@@ -351,6 +389,7 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                cl_event *event)
 {
   static struct work_size_s work_sizes;
+  static cl_event kernel_evt;
   
   struct ld_kernel_s *ldKernel = find_kernel_entry(kernel);
   int i;
@@ -361,6 +400,12 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
     work_sizes.local[i] = local_work_size[i];
     work_sizes.global[i] = global_work_size[i]/work_sizes.local[i];
   }
+
+#if ENABLE_KERNEL_PROFILING == 1
+  if (!event) {
+    event = &kernel_evt;
+  }
+#endif
   
   kernel_executed_event(ldKernel, &work_sizes, work_dim);
   
@@ -368,6 +413,9 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                         global_work_offset, global_work_size,
                                         local_work_size, num_events_in_wait_list,
                                         event_wait_list, event);
+#if ENABLE_KERNEL_PROFILING == 1
+  clSetEventCallback(*event, CL_COMPLETE, kernel_profiler_cb, ldKernel);
+#endif
 
 #if FORCE_FINISH_KERNEL
   real_clFinish(command_queue);
