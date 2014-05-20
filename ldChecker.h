@@ -118,6 +118,20 @@ struct ld_kernel_s {
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
 
+#if WITH_MPI == 1 && ONLY_MPI_ROOT_OUTPUT == 1
+extern int myrank;
+#define ONLY_MPI_MASTER()      \
+  if (myrank != -1 && myrank != 0) { \
+    return;                          \
+  }
+#define IS_MPI_MASTER() myrank != -1 && myrank != 0
+#else
+#define ONLY_MPI_MASTER()
+#define IS_MPI_MASTER()
+#endif
+
+/** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
+
 void dbg_crash_event(void);
 void dbg_notify_event(void);
 

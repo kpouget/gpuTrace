@@ -14,17 +14,6 @@
 
 #define MAX_LEN_ONE_NUMBER 16
 
-#if WITH_MPI == 1 && ONLY_MPI_ROOT_OUTPUT == 1
-#define ONLY_MPI_MASTER()      \
-  if (myrank != -1 && myrank != 0) { \
-    return;                          \
-  }
-#define IS_MPI_MASTER() myrank != -1 && myrank != 0
-#else
-#define ONLY_MPI_MASTER()
-#define IS_MPI_MASTER()
-#endif
-
 struct type_info_s TYPE_FORMATTERS[] = {
   {"unsigned int", "%u", sizeof(unsigned int),  TYPE_INFO_UINT},
   {"int", "%d", sizeof(int), TYPE_INFO_INT},
