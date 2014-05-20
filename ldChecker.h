@@ -38,7 +38,7 @@
  * MPI support                
  ******************************/
 
-#define WITH_MPI 0
+#define WITH_MPI 1
 #define ONLY_MPI_ROOT_OUTPUT 1
 
 /******************************
@@ -124,10 +124,10 @@ extern int myrank;
   if (myrank != -1 && myrank != 0) { \
     return;                          \
   }
-#define IS_MPI_MASTER() myrank != -1 && myrank != 0
+#define IS_MPI_MASTER() (myrank != -1 && myrank != 0)
 #else
 #define ONLY_MPI_MASTER()
-#define IS_MPI_MASTER()
+#define IS_MPI_MASTER() 1
 #endif
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
