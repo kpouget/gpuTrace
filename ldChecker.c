@@ -505,8 +505,9 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
 #endif
   
   if (offset + size > ldBuffer->size) {
-    warning("%s too many bits: %zub at +%zu, buffer is %zu\n",
-            is_read ? "reading" : "writing",
+    warning("%s too many bits from buffer #%d: %zub at +%zu, buffer is %zu\n",
+            is_read ? "reading" : "writing", 
+            ldBuffer->uid,
             size, offset, ldBuffer->size);
   }
 }
@@ -585,7 +586,7 @@ void buffer_released (struct ld_mem_s *ldBuffer) {
 #if PRINT_BUFFER_RELEASE
   info("Release buffer #%d\n", ldBuffer->uid);
 #endif
-  ldBuffer->handle = NULL;
+  ldBuffer->handle = NULL; // handles can be reused, so dont keep the old one
   ldBuffer->released = 1;
   ldBuffer->has_values = 0;
   ldBuffer->values_outdated = 0;

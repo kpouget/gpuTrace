@@ -37,12 +37,14 @@ struct ld_ocl_s {
 } ldOclEnv;
 
 struct ld_program_s {
+  unsigned int uid;
   cl_program handle;
   char *source;
   unsigned int released;
 };
 
 struct ld_mem_offset_s {
+  unsigned int uid;
   cl_mem handle;
   size_t size;
   ld_flags flags;
@@ -52,6 +54,7 @@ struct ld_mem_offset_s {
 };
 
 struct ld_queue_s {
+  unsigned int uid;
   cl_command_queue handle;
 };
 
@@ -106,12 +109,13 @@ cl_int (*real_clEnqueueReadBuffer) (cl_command_queue command_queue,
                                     cl_uint num_events_in_wait_list,
                                     const cl_event *event_wait_list,
                                     cl_event *event);
+cl_int (*real_clReleaseKernel) (cl_kernel kernel);
+cl_int (*real_clReleaseProgram) (cl_program program);
 
 struct ld_bindings_s ocl_bindings[] = {
   {"clSetKernelArg", (void **) &real_clSetKernelArg},
   {"clCreateBuffer", (void **) &real_clCreateBuffer},
   {"clCreateSubBuffer", (void **) &real_clCreateSubBuffer},
-  {"clReleaseMemObject", (void **) &real_clReleaseMemObject},
   {"clCreateKernel", (void **) &real_clCreateKernel},
   {"clCreateProgramWithSource", (void **) &real_clCreateProgramWithSource},
   {"clEnqueueNDRangeKernel", (void **) &real_clEnqueueNDRangeKernel},
@@ -120,6 +124,9 @@ struct ld_bindings_s ocl_bindings[] = {
   {"clCreateCommandQueue", (void **) &real_clCreateCommandQueue},
   {"clFinish", (void **) &real_clFinish},
   {"clReleaseCommandQueue", (void **) &real_clReleaseCommandQueue},
+  {"clReleaseMemObject", (void **) &real_clReleaseMemObject},
+  {"clReleaseKernel", (void **) &real_clReleaseKernel},
+  {"clReleaseProgram", (void **) &real_clReleaseProgram},
   {NULL, NULL}
 };
 
@@ -228,21 +235,21 @@ cl_int clReleaseCommandQueue (cl_command_queue command_queue) {
     struct ld_program_s *ldprogram;
     struct ld_kernel_s *ldkernel;
     struct ld_mem_s *ldmem;
-    struct ld_mem_offset_s *ldmem_offset;
+    //struct ld_mem_offset_s *ldmem_offset;
     
 #define CHECK_ALL_RELEASED(_NAME)                               \
     FOR_ALL_MAP_ELTS(i, ld##_NAME, _NAME) {                     \
       if (!ld##_NAME->released) {                               \
         warning("Memory leak: " # _NAME                         \
-                " %p not released. (#%d)\n",                    \
-                ld##_NAME->handle, i);                          \
+                " %p not released. (#%d) %d\n",                 \
+                ld##_NAME->handle, ld##_NAME->uid, ld##_NAME->released);     \
       }                                                         \
     }                                                           \
     
     CHECK_ALL_RELEASED(program);
     CHECK_ALL_RELEASED(kernel);
     CHECK_ALL_RELEASED(mem);
-    CHECK_ALL_RELEASED(mem_offset);
+    //CHECK_ALL_RELEASED(mem_offset);
   }
 #endif
   return real_clReleaseCommandQueue (command_queue);
@@ -263,6 +270,16 @@ cl_program clCreateProgramWithSource (cl_context context,
   handle_program(program->handle, count, strings, lengths);
   
   return program->handle;
+}
+
+cl_int clReleaseProgram (cl_program program) {
+  struct ld_program_s *ldProgram = find_program_entry(program);
+
+  assert(ldProgram);
+
+  ldProgram->released = 1;
+
+  return real_clReleaseProgram (program);
 }
 
 /* ************************************************************************* */
@@ -401,6 +418,16 @@ cl_kernel clCreateKernel (cl_program  program,
   kernel_created_event(ldKernel);
   
   return ldKernel->handle;
+}
+
+cl_int clReleaseKernel (cl_kernel kernel) {
+  struct ld_kernel_s *ldKernel = find_kernel_entry(kernel);
+
+  assert(ldKernel);
+
+  ldKernel->released = 1;
+
+  return real_clReleaseKernel (kernel);
 }
 
 /* ************************************************************************* */
@@ -576,7 +603,7 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue,
 {
   readWriteMemory(buffer, (void **) ptr, LD_WRITE, size, offset);
   
-  return real_clEnqueueWriteBuffer(command_queue, buffer, CL_TRUE /* blocking_write */,
+  return real_clEnqueueWriteBuffer(command_queue, buffer, blocking_write,
                                    offset, size, ptr, num_events_in_wait_list,
                                    event_wait_list, event);
 }

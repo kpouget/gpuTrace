@@ -47,11 +47,26 @@ def parse(lines, kernel_name):
     parameters = []
     while True:
         line = lines.send(None)
+        if " __attribute__" in line:
+            idx = line.index(" __attribute__")
+            closeAt = idx
+            parents = 0
+            inside = False
+            while not (inside and parents == 0):
+                if line[closeAt] == "(":
+                    inside = True
+                    parents += 1
+                elif line[closeAt] == ")":
+                    parents -= 1
+                closeAt += 1
+
+            line = line[:idx] + line[closeAt:]
+            
         if kernel_name in line:
             while not "{" in line:
                 line += " " + lines.send(None).strip()
             break
-
+        
     for param in line.split("(")[1].split(")")[0].split(","):
         param = param.strip()
         type_ = " ".join([w for w in param.split()[:-1] if not w.startswith("__")])

@@ -107,6 +107,7 @@ struct ld_kern_param_s {
 };
 
 struct ld_kernel_s {
+  unsigned int uid;
   void *handle;
   int nb_params;
   const char *name;
@@ -193,7 +194,7 @@ void gpu_trace(const char *format, ...);
     if (_NAME##_elt_count >= _MAX_KEYS) {                               \
       return NULL;                                                      \
     }                                                                   \
-                                                                        \
+    _NAME##_map[_NAME##_elt_count].uid =_NAME##_elt_count;              \
     return &_NAME##_map[_NAME##_elt_count++];                           \
   }                                                                     \
                                                                         \
@@ -209,7 +210,7 @@ void gpu_trace(const char *format, ...);
 #define FOR_ALL_MAP_ELTS(_CPT, _VAR, _NAME)                             \
   for (_CPT = 0, _VAR = &_NAME##_map[_CPT];                             \
        _CPT < _NAME##_elt_count;                                        \
-       _CPT++)
+       _CPT++, _VAR = &_NAME##_map[_CPT])
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
 

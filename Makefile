@@ -42,7 +42,7 @@ clean : clean-cuda clean-python
 clean-python : 
 	rm -rf __pycache__
 
-MPI_RUN = mpirun -n 6 -x 
+MPI_RUN = #mpirun -n 6 -x 
 ### OCL example ###
 
 SERGE_OCL_DIR := ~/travail/sample/OpenCL/Apriori_GPU/
