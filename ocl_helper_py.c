@@ -2,8 +2,16 @@
 
 #include "ocl_helper.h"
 
-#define FILENAME "parse_ocl_program"
+#define PYTHON_MOD_NAME "parse_ocl_program"
 
+#ifndef PYTHON_MOD_PATH
+#define PYTHON_MOD_PATH /home/kevin/travail/sample/gpuTrace
+#endif
+
+#define STR(_str_) #_str_
+#define xSTR(_x_, _str_) _x_ ## _str_
+#define LSTR_(_str_) xSTR(L, #_str_)
+#define LSTR(_str_) LSTR_(_str_)
 
 PyObject *pf_parse_ocl, *pf_prep_progr;
 
@@ -11,12 +19,9 @@ void init_helper(void) {
   PyObject *pDict, *pModule;
   
   Py_Initialize();
-  PySys_SetPath(
-    //L"/home/kevin/travail/sample/cl-specfem3d/SPECFEM3D_GLOBE/ldChecker"
-    L"/home/kevin/travail/sample/gpuTrace"
-    );
+  PySys_SetPath(LSTR(PYTHON_MOD_PATH));
   
-  pModule = PyImport_ImportModule(FILENAME);
+  pModule = PyImport_ImportModule(PYTHON_MOD_NAME);
   PyErr_Print();
   
   pDict = PyModule_GetDict(pModule);

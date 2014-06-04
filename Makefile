@@ -22,6 +22,8 @@ all : $(OCL_SO_NAME) # $(CUDA_SO_NAME)
 ### OpenCL  ####
 ################
 
+PYTHON_MOD_PATH=$(shell pwd)
+
 $(OCL_SO_NAME) : instr-ocl.o ocl_helper_py.o ldChecker.o
 	gcc -o $@ $^ $(SO_LDFLAGS)
 
@@ -29,7 +31,7 @@ instr-ocl.o : instr-ocl.c ocl_helper.h ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS)
 
 ocl_helper_py.o : ocl_helper_py.c ocl_helper.h
-	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS)
+	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS) -DPYTHON_MOD_PATH=$(PYTHON_MOD_PATH)
 
 ldChecker.o : ldChecker.c ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS) -I/usr/lib/openmpi/include
@@ -40,17 +42,18 @@ clean : clean-cuda clean-python
 clean-python : 
 	rm -rf __pycache__
 
-MPI_RUN = # mpirun -n 6 -x
+MPI_RUN = mpirun -n 6 -x 
 ### OCL example ###
 
 SERGE_OCL_DIR := ~/travail/sample/OpenCL/Apriori_GPU/
 SERGE_OCL_APPLI := ./AprioriPBI src/chess.dat 3000
 
-SPECFEM_OCL_DIR := /home/kevin/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
+SPECFEM_OCL_DIR := /home/$(USER)/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
 SPECFEM_OCL_APPLI := bin/xspecfem3D
 
-OCL_DIR := $(SERGE_OCL_DIR)
-OCL_APPLI := $(SERGE_OCL_APPLI)
+
+OCL_DIR := $(SPECFEM_OCL_DIR)
+OCL_APPLI := $(SPECFEM_OCL_APPLI)
 
 run_ocl : $(OCL_SO_NAME)
 	cd $(OCL_DIR) && $(MPI_RUN) $(OCL_LD_PRELOAD_ENV) $(OCL_APPLI) || echo "Failed"

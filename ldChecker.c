@@ -136,7 +136,8 @@ void kernel_created_event(struct ld_kernel_s *ldKernel) {
 
   ldKernel->exec_counter = 0;
 #if ENABLE_KERNEL_PROFILING == 1
-  ldKernel->exec_span = 0;
+  ldKernel->exec_span_ns = 0;
+  ldKernel->exec_span_ms = 0;
 #endif
 }
 
@@ -339,6 +340,7 @@ finish:
   free(buffer);
 }
 
+#if PRINT_KERNEL_BEFORE_EXEC == 1 || PRINT_KERNEL_AFTER_EXEC == 1
 #define SPACER "     "
 static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
                                             const struct work_size_s *work_sizes,
@@ -427,6 +429,7 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
     gpu_trace("\n);\n");
   }
 }
+#endif
 
 void kernel_executed_event(struct ld_kernel_s *ldKernel,
                            const struct work_size_s *work_sizes,
@@ -470,8 +473,9 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
     warning("reading in read-only buffer #%d\n", ldBuffer->uid);
   }
 
-  //need to pay attention to size and offset
-  memcpy(ldBuffer->first_values, ptr, FIRST_BYTES_TO_READ);
+  size = FIRST_BYTES_TO_READ < size ? FIRST_BYTES_TO_READ : size;
+  //need to pay attention to offset
+  memcpy(ldBuffer->first_values, ptr, size);
   ldBuffer->has_values = 1;
   ldBuffer->values_outdated = 0;
   

@@ -3,6 +3,34 @@
 #include "ldChecker.h"
 #include "ocl_helper.h"
 
+#include <inttypes.h>
+#include <signal.h>
+#include <pthread.h>
+
+#ifdef __GNUC__
+#define UNUSED __attribute__ ((unused))
+#else
+#define UNUSED
+#endif
+
+#define NS_TO_MS(_ns_) ((_ns_)/1000000)
+const char* clewErrorString (cl_int error);
+  
+static int mocl_errcode;
+static inline cl_int _clCheck(cl_int errcode, const char *file, int line, const char *func) {
+  mocl_errcode = errcode;
+  if (mocl_errcode != CL_SUCCESS) {
+    fprintf (stderr, "Error %d/%s at %s:%d %s\n", mocl_errcode,
+             clewErrorString(mocl_errcode),
+             file, line, func);
+    fflush(NULL);
+    exit(1);
+  }
+  return errcode;
+}
+#define clCheck(to_check) _clCheck(to_check,__FILE__, __LINE__,  __func__)
+#define clck_(var) var); clCheck(*var
+
 struct ld_ocl_s {
   cl_context context;
   cl_command_queue command_queue;
@@ -103,6 +131,13 @@ CREATE_HASHMAP(queue, cl_command_queue, 10)
 
 /* ************************************************************************* */
 
+static void sig_handler(int signum);
+
+#if ENABLE_KERNEL_PROFILING == 1
+pthread_mutex_t stats_lock;
+static void print_statistics(int force);
+#endif
+
 int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                           size_t offset, size_t size);
 struct ld_mem_s *create_ocl_buffer (cl_mem handle);
@@ -110,9 +145,25 @@ struct ld_mem_s *create_ocl_buffer (cl_mem handle);
 void init_ocl_ldchecker(void) {
   struct callback_s callbacks = {ocl_getBufferContent};
   
+#if ENABLE_KERNEL_PROFILING == 1
+  pthread_mutex_init(&stats_lock, NULL);
+  
+  signal(SIGUSR1, sig_handler);
+#endif
+  
   init_ldchecker(callbacks, ocl_bindings);
   create_ocl_buffer(NULL);
   init_helper();
+}
+
+void UNUSED sig_handler(int signum) {
+  switch(signum) {
+#if ENABLE_KERNEL_PROFILING == 1
+  case SIGUSR1:
+    print_statistics(1);
+    break;
+#endif
+  }
 }
 
 cl_command_queue clCreateCommandQueue(cl_context context,
@@ -137,25 +188,39 @@ cl_int clFinish (cl_command_queue command_queue) {
   return real_clFinish(command_queue);
 }
 
-cl_int clReleaseCommandQueue (cl_command_queue command_queue) {
-
 #if ENABLE_KERNEL_PROFILING == 1
-  if (IS_MPI_MASTER()) {
+static void print_statistics(int force) {
+  if (force || IS_MPI_MASTER()) {
     int i;
+
+    pthread_mutex_lock(&stats_lock);
     
     for (i = 0; i < kernel_elt_count; i++) {
       struct ld_kernel_s *ldKernel = &kernel_map[i];
-      
-      info("Kernel %s was executed %d times.\n", ldKernel->name, ldKernel->exec_counter);
-      
+
       if (ldKernel->exec_counter == 0) {
         continue;
       }
       
-      info("\t- it took %uns.\n", ldKernel->exec_span);
-      info("\t- that's an average of %uns.\n", ldKernel->exec_span / ldKernel->exec_counter);
+      info("Kernel %s:\n", ldKernel->name);
+      info("\t- was executed %d times\n", ldKernel->exec_counter);
+      
+      unsigned long avg_ns = ldKernel->exec_span_ns / ldKernel->exec_counter;
+      unsigned long avg_ms = ldKernel->exec_span_ms / ldKernel->exec_counter;
+      info("\t- it took %"PRId64"ms (%"PRId64"ns).\n", ldKernel->exec_span_ms, ldKernel->exec_span_ns);
+      info("\t- average time was %"PRId64"ms (%"PRId64"ns).\n", avg_ms, avg_ns);
     }
+    info("---------------\n");
+
+    pthread_mutex_unlock(&stats_lock);
   }
+}
+#endif
+
+cl_int clReleaseCommandQueue (cl_command_queue command_queue) {
+
+#if ENABLE_KERNEL_PROFILING == 1
+  print_statistics(0);
 #endif
 #if ENABLE_LEAK_DETECTION == 1
   if (IS_MPI_MASTER()) {
@@ -392,12 +457,29 @@ static void CL_CALLBACK  kernel_profiler_cb (cl_event event,
                                              void *user_data)
 {
   static cl_ulong tstart, tstop, len;
-  
+  cl_int refcnt;
   struct ld_kernel_s *ldKernel = (struct ld_kernel_s *) user_data;
-  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(tstart), &tstart, NULL);
-  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(tstop), &tstop, NULL);
+  
+  pthread_mutex_lock(&stats_lock);
+  clReleaseEvent(event);
+  clCheck(clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(tstop), &tstop, NULL));
+  clCheck(clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(tstart), &tstart, NULL));
+
+  clCheck(clGetEventInfo(event,  CL_EVENT_REFERENCE_COUNT, sizeof(refcnt), &refcnt, NULL));
+  
   len = tstop - tstart;
-  ldKernel->exec_span += len;
+  if (tstart > tstop) {
+    len = tstart - tstop;
+  }
+
+  if (tstart == 0ul || tstop == 0ul) {
+    //printf("suspicious timespan: %lu for %s/%d (%lu to %lu) -- %d\n", len, ldKernel->name, ldKernel->exec_counter, tstart, tstop, refcnt);
+    len = 0;
+  }
+
+  ldKernel->exec_span_ns += len;
+  ldKernel->exec_span_ms += NS_TO_MS(len);
+  pthread_mutex_unlock(&stats_lock);
 }
 #endif
 
@@ -412,7 +494,6 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                cl_event *event)
 {
   static struct work_size_s work_sizes;
-  static cl_event kernel_evt;
   
   struct ld_kernel_s *ldKernel = find_kernel_entry(kernel);
   int i;
@@ -425,8 +506,10 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
   }
 
 #if ENABLE_KERNEL_PROFILING == 1
+  static cl_event kern_event;
+  
   if (!event) {
-    event = &kernel_evt;
+    event = &kern_event; // scope of the event is limited to this function.
   }
 #endif
   
@@ -437,13 +520,22 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                         local_work_size, num_events_in_wait_list,
                                         event_wait_list, event);
 #if ENABLE_KERNEL_PROFILING == 1
+  //cl_int refcnt;
+  clCheck(errcode);
+  //printf("our event ? %s\n", event == &kern_event ? "yes" : "no");
+  
+  //clCheck(clGetEventInfo(*event,  CL_EVENT_REFERENCE_COUNT, sizeof(refcnt), &refcnt, NULL));
+  //printf("before refcnt is %d\n", refcnt);
+  clRetainEvent(*event);
   clSetEventCallback(*event, CL_COMPLETE, kernel_profiler_cb, ldKernel);
+  //clCheck(clGetEventInfo(*event,  CL_EVENT_REFERENCE_COUNT, sizeof(refcnt), &refcnt, NULL));
+  //printf("after refcnt is %d\n", refcnt);  
 #endif
 
 #if FORCE_FINISH_KERNEL
   real_clFinish(command_queue);
 #endif
-
+  
   kernel_finished_event(ldKernel, &work_sizes, work_dim);
   
   return errcode;
@@ -511,4 +603,90 @@ cl_int clEnqueueReadBuffer (cl_command_queue command_queue,
   
   
   return errcode;
+}
+
+
+/* The OpenCL Extension Wrangler Library
+ * https://code.google.com/p/clew/
+ * MIT License
+ * */
+
+const char* clewErrorString (cl_int error) {
+  static const char* strings[] = {
+    // Error Codes
+    "CL_SUCCESS"                                  //   0
+    , "CL_DEVICE_NOT_FOUND"                         //  -1
+    , "CL_DEVICE_NOT_AVAILABLE"                     //  -2
+    , "CL_COMPILER_NOT_AVAILABLE"                   //  -3
+    , "CL_MEM_OBJECT_ALLOCATION_FAILURE"            //  -4
+    , "CL_OUT_OF_RESOURCES"                         //  -5
+    , "CL_OUT_OF_HOST_MEMORY"                       //  -6
+    , "CL_PROFILING_INFO_NOT_AVAILABLE"             //  -7
+    , "CL_MEM_COPY_OVERLAP"                         //  -8
+    , "CL_IMAGE_FORMAT_MISMATCH"                    //  -9
+    , "CL_IMAGE_FORMAT_NOT_SUPPORTED"               //  -10
+    , "CL_BUILD_PROGRAM_FAILURE"                    //  -11
+    , "CL_MAP_FAILURE"                              //  -12
+
+    , ""    //  -13
+    , ""    //  -14
+    , ""    //  -15
+    , ""    //  -16
+    , ""    //  -17
+    , ""    //  -18
+    , ""    //  -19
+
+    , ""    //  -20
+    , ""    //  -21
+    , ""    //  -22
+    , ""    //  -23
+    , ""    //  -24
+    , ""    //  -25
+    , ""    //  -26
+    , ""    //  -27
+    , ""    //  -28
+    , ""    //  -29
+
+    , "CL_INVALID_VALUE"                            //  -30
+    , "CL_INVALID_DEVICE_TYPE"                      //  -31
+    , "CL_INVALID_PLATFORM"                         //  -32
+    , "CL_INVALID_DEVICE"                           //  -33
+    , "CL_INVALID_CONTEXT"                          //  -34
+    , "CL_INVALID_QUEUE_PROPERTIES"                 //  -35
+    , "CL_INVALID_COMMAND_QUEUE"                    //  -36
+    , "CL_INVALID_HOST_PTR"                         //  -37
+    , "CL_INVALID_MEM_OBJECT"                       //  -38
+    , "CL_INVALID_IMAGE_FORMAT_DESCRIPTOR"          //  -39
+    , "CL_INVALID_IMAGE_SIZE"                       //  -40
+    , "CL_INVALID_SAMPLER"                          //  -41
+    , "CL_INVALID_BINARY"                           //  -42
+    , "CL_INVALID_BUILD_OPTIONS"                    //  -43
+    , "CL_INVALID_PROGRAM"                          //  -44
+    , "CL_INVALID_PROGRAM_EXECUTABLE"               //  -45
+    , "CL_INVALID_KERNEL_NAME"                      //  -46
+    , "CL_INVALID_KERNEL_DEFINITION"                //  -47
+    , "CL_INVALID_KERNEL"                           //  -48
+    , "CL_INVALID_ARG_INDEX"                        //  -49
+    , "CL_INVALID_ARG_VALUE"                        //  -50
+    , "CL_INVALID_ARG_SIZE"                         //  -51
+    , "CL_INVALID_KERNEL_ARGS"                      //  -52
+    , "CL_INVALID_WORK_DIMENSION"                   //  -53
+    , "CL_INVALID_WORK_GROUP_SIZE"                  //  -54
+    , "CL_INVALID_WORK_ITEM_SIZE"                   //  -55
+    , "CL_INVALID_GLOBAL_OFFSET"                    //  -56
+    , "CL_INVALID_EVENT_WAIT_LIST"                  //  -57
+    , "CL_INVALID_EVENT"                            //  -58
+    , "CL_INVALID_OPERATION"                        //  -59
+    , "CL_INVALID_GL_OBJECT"                        //  -60
+    , "CL_INVALID_BUFFER_SIZE"                      //  -61
+    , "CL_INVALID_MIP_LEVEL"                        //  -62
+    , "CL_INVALID_GLOBAL_WORK_SIZE"                 //  -63
+    , "CL_UNKNOWN_ERROR_CODE"
+  };
+
+  if (error >= -63 && error <= 0) {
+    return strings[-error];
+  } else {
+    return strings[64];
+  }
 }

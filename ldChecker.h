@@ -14,8 +14,8 @@
 #define PRINT_BUFFER_TRANSFER 0
 #define PRINT_BUFFER_RELEASE 0
 
-#define PRINT_KERNEL_BEFORE_EXEC 1
-#define PRINT_KERNEL_AFTER_EXEC 1
+#define PRINT_KERNEL_BEFORE_EXEC 0
+#define PRINT_KERNEL_AFTER_EXEC 0
 #define PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST 0
 #define PRINT_KERNEL_NAME_ONLY 1
 
@@ -114,7 +114,8 @@ struct ld_kernel_s {
   unsigned int exec_counter;
   unsigned int released;
 #if ENABLE_KERNEL_PROFILING == 1
-  unsigned long int exec_span;
+  unsigned long long int exec_span_ns;
+  unsigned long long int exec_span_ms;
 #endif
 };
 
