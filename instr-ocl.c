@@ -11,6 +11,7 @@ struct ld_ocl_s {
 struct ld_program_s {
   cl_program handle;
   char *source;
+  unsigned int released;
 };
 
 struct ld_mem_offset_s {
@@ -156,7 +157,29 @@ cl_int clReleaseCommandQueue (cl_command_queue command_queue) {
     }
   }
 #endif
-  
+#if ENABLE_LEAK_DETECTION == 1
+  if (IS_MPI_MASTER()) {
+    int i;
+    struct ld_program_s *ldprogram;
+    struct ld_kernel_s *ldkernel;
+    struct ld_mem_s *ldmem;
+    struct ld_mem_offset_s *ldmem_offset;
+    
+#define CHECK_ALL_RELEASED(_NAME)                               \
+    FOR_ALL_MAP_ELTS(i, ld##_NAME, _NAME) {                     \
+      if (!ld##_NAME->released) {                               \
+        warning("Memory leak: " # _NAME                         \
+                " %p not released. (#%d)\n",                    \
+                ld##_NAME->handle, i);                          \
+      }                                                         \
+    }                                                           \
+    
+    CHECK_ALL_RELEASED(program);
+    CHECK_ALL_RELEASED(kernel);
+    CHECK_ALL_RELEASED(mem);
+    CHECK_ALL_RELEASED(mem_offset);
+  }
+#endif
   return real_clReleaseCommandQueue (command_queue);
 }
 /* ************************************************************************* */

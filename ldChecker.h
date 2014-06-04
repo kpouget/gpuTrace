@@ -42,10 +42,11 @@
 #define ONLY_MPI_ROOT_OUTPUT 1
 
 /******************************
- * Execution profiling
+ * Execution monitoring
  ******************************/
 
 #define ENABLE_KERNEL_PROFILING 1
+#define ENABLE_LEAK_DETECTION 1
 
 /******************************
  ******************************
@@ -87,7 +88,7 @@ struct ld_mem_s {
   ld_flags flags;
   int has_values;
   int values_outdated;
-  int released;
+  unsigned int released;
   char first_values[FIRST_BYTES_TO_READ];
 };
 
@@ -111,6 +112,7 @@ struct ld_kernel_s {
   const char *name;
   struct ld_kern_param_s *params;
   unsigned int exec_counter;
+  unsigned int released;
 #if ENABLE_KERNEL_PROFILING == 1
   unsigned long int exec_span;
 #endif
@@ -124,7 +126,7 @@ extern int myrank;
   if (myrank != -1 && myrank != 0) { \
     return;                          \
   }
-#define IS_MPI_MASTER() (myrank != -1 && myrank != 0)
+#define IS_MPI_MASTER() (myrank == -1 || myrank == 0)
 #else
 #define ONLY_MPI_MASTER()
 #define IS_MPI_MASTER() 1
@@ -203,6 +205,10 @@ void gpu_trace(const char *format, ...);
         next->handle = key;                                             \
         return _NAME##_elt_count - 1;   /* next - start / size ? */     \
   }     
+#define FOR_ALL_MAP_ELTS(_CPT, _VAR, _NAME)                             \
+  for (_CPT = 0, _VAR = &_NAME##_map[_CPT];                             \
+       _CPT < _NAME##_elt_count;                                        \
+       _CPT++)
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
 
