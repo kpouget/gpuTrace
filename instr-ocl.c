@@ -266,6 +266,11 @@ cl_program clCreateProgramWithSource (cl_context context,
   program->handle = real_clCreateProgramWithSource(context, count, strings,
                                                    lengths, errcode_ret);
 
+  if (!IS_MPI_MASTER()) {
+    program_elt_count--;
+    return program->handle;
+  }
+  
   handle_program(program->handle, count, strings, lengths);
   
   return program->handle;
@@ -285,6 +290,7 @@ cl_int clReleaseProgram (cl_program program) {
 
 static inline ld_flags ocl_buffer_flags_to_ld (cl_mem_flags flags) {
   ld_flags ldFlags = 0;
+  
   if (flags & CL_MEM_WRITE_ONLY) ldFlags |= LD_FLAG_WRITE_ONLY;
   if (flags & CL_MEM_READ_ONLY) ldFlags |= LD_FLAG_READ_ONLY;
   if (flags & CL_MEM_READ_WRITE) ldFlags |= LD_FLAG_READ_WRITE;
@@ -401,7 +407,12 @@ cl_kernel clCreateKernel (cl_program  program,
  
   ldKernel->handle = real_clCreateKernel(program, kernel_name, errcode_ret);
   ldKernel->name = kernel_name;
-
+  
+  if (!IS_MPI_MASTER()) {
+    kernel_elt_count--;
+    return ldKernel->handle;
+  }
+    
   types_and_names = handle_create_kernel(program, ldKernel->handle, kernel_name);
   for (nb_params = 0; types_and_names[nb_params]; nb_params++);
   nb_params /= 2;

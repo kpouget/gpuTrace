@@ -31,7 +31,7 @@ instr-ocl.o : instr-ocl.c ocl_helper.h ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS)
 
 ocl_helper_py.o : ocl_helper_py.c ocl_helper.h
-	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS) -DPYTHON_MOD_PATH=$(PYTHON_MOD_PATH)
+	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS)
 
 ldChecker.o : ldChecker.c ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS) -I/usr/lib/openmpi/include
@@ -50,7 +50,6 @@ SERGE_OCL_APPLI := ./AprioriPBI src/chess.dat 3000
 
 SPECFEM_OCL_DIR := /home/$(USER)/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
 SPECFEM_OCL_APPLI := bin/xspecfem3D
-
 
 OCL_DIR := $(SPECFEM_OCL_DIR)
 OCL_APPLI := $(SPECFEM_OCL_APPLI)

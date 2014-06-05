@@ -14,7 +14,6 @@ def get_prog_lines():
             yield line
 
 programs = {}
-
 def prepare_program(uid, lines):
     progr_lines = []
     for line in lines:
@@ -66,7 +65,7 @@ def parse(lines, kernel_name):
             while not "{" in line:
                 line += " " + lines.send(None).strip()
             break
-        
+
     for param in line.split("(")[1].split(")")[0].split(","):
         param = param.strip()
         type_ = " ".join([w for w in param.split()[:-1] if not w.startswith("__")])
@@ -76,6 +75,7 @@ def parse(lines, kernel_name):
             type_ = type_ + " *"
         parameters.append(type_)
         parameters.append(name)
+
     return parameters
 
 

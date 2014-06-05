@@ -44,6 +44,7 @@ void handle_program(void *program,
   
   for (i = 0; i < count; i++) {
     PyObject *line;
+    
     if (!lengths || !lengths[i])
       line = PyUnicode_FromString(strings[i]);
     else
@@ -68,14 +69,22 @@ char **handle_create_kernel(void *program, void *kernel, const char *name) {
   PyObject *p_kern_uid = PyUnicode_FromFormat("%p", kernel);
   PyObject *p_kern_name = PyUnicode_FromString(name);
   PyObject *p_result, *p_params = PyTuple_Pack(2, p_progr_uid, p_kern_name);
-  Py_ssize_t result_size;
+  Py_ssize_t py_result_size;
+  int result_size;
   char **param_types_names;
   int i;
   
   p_result = PyObject_Call(pf_parse_ocl, p_params, NULL);
   PyErr_Print();
-
-  result_size = PyList_Size(p_result);
+  
+  if (!p_result) {
+    printf("ERROR, no result ...\n");
+    perror("help...");
+    exit(-1);
+  }
+  py_result_size = PyList_Size(p_result);
+  result_size = Py_SAFE_DOWNCAST(py_result_size, Py_ssize_t, int);
+  
   param_types_names = malloc(sizeof(char *)*(result_size + 1));
   
   for (i = 0; i < result_size; i++) {
