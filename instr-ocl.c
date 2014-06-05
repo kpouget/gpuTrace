@@ -213,9 +213,8 @@ static void print_statistics(int force) {
       info("\t- was executed %d times\n", ldKernel->exec_counter);
       
       unsigned long avg_ns = ldKernel->exec_span_ns / ldKernel->exec_counter;
-      unsigned long avg_ms = ldKernel->exec_span_ms / ldKernel->exec_counter;
-      info("\t- it took %"PRId64"ms (%"PRId64"ns).\n", ldKernel->exec_span_ms, ldKernel->exec_span_ns);
-      info("\t- average time was %"PRId64"ms (%"PRId64"ns).\n", avg_ms, avg_ns);
+      info("\t- it took %"PRId64"ms (%"PRId64"ns).\n", NS_TO_MS(ldKernel->exec_span_ns), ldKernel->exec_span_ns);
+      info("\t- average time was %"PRId64"ms (%"PRId64"ns).\n", NS_TO_MS(avg_ns), avg_ns);
     }
     info("---------------\n");
 
@@ -505,7 +504,6 @@ static void CL_CALLBACK  kernel_profiler_cb (cl_event event,
   }
 
   ldKernel->exec_span_ns += len;
-  ldKernel->exec_span_ms += NS_TO_MS(len);
   pthread_mutex_unlock(&stats_lock);
 }
 #endif
@@ -547,16 +545,10 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
                                         local_work_size, num_events_in_wait_list,
                                         event_wait_list, event);
 #if ENABLE_KERNEL_PROFILING == 1
-  //cl_int refcnt;
   clCheck(errcode);
-  //printf("our event ? %s\n", event == &kern_event ? "yes" : "no");
   
-  //clCheck(clGetEventInfo(*event,  CL_EVENT_REFERENCE_COUNT, sizeof(refcnt), &refcnt, NULL));
-  //printf("before refcnt is %d\n", refcnt);
   clRetainEvent(*event);
   clSetEventCallback(*event, CL_COMPLETE, kernel_profiler_cb, ldKernel);
-  //clCheck(clGetEventInfo(*event,  CL_EVENT_REFERENCE_COUNT, sizeof(refcnt), &refcnt, NULL));
-  //printf("after refcnt is %d\n", refcnt);  
 #endif
 
 #if FORCE_FINISH_KERNEL

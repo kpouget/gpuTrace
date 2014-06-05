@@ -137,7 +137,6 @@ void kernel_created_event(struct ld_kernel_s *ldKernel) {
   ldKernel->exec_counter = 0;
 #if ENABLE_KERNEL_PROFILING == 1
   ldKernel->exec_span_ns = 0;
-  ldKernel->exec_span_ms = 0;
 #endif
 }
 

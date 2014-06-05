@@ -116,7 +116,6 @@ struct ld_kernel_s {
   unsigned int released;
 #if ENABLE_KERNEL_PROFILING == 1
   unsigned long long int exec_span_ns;
-  unsigned long long int exec_span_ms;
 #endif
 };
 
