@@ -31,7 +31,7 @@ instr-ocl.o : instr-ocl.c ocl_helper.h ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS)
 
 ocl_helper_py.o : ocl_helper_py.c ocl_helper.h
-	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS)
+	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS) -DPYTHON_MOD_PATH=$(PYTHON_MOD_PATH)
 
 ldChecker.o : ldChecker.c ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS) -I/usr/lib/openmpi/include
