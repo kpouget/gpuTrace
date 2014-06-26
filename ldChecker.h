@@ -14,25 +14,36 @@
 #define PRINT_BUFFER_TRANSFER 0
 #define PRINT_BUFFER_RELEASE 0
 
-#define PRINT_KERNEL_BEFORE_EXEC 0
-#define PRINT_KERNEL_AFTER_EXEC 0
+#define PRINT_KERNEL_BEFORE_EXEC 1
+#define PRINT_KERNEL_AFTER_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST 0
-#define PRINT_KERNEL_NAME_ONLY 1
+#define PRINT_KERNEL_NAME_ONLY 0
 
-#define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 0
+#define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 1
 
 #define BUFFER_ZERO_IS_NULL 1
 
 #define FORCE_FINISH_KERNEL 0
 
 /******************************
+ * Filters for kernel execution 
+ ******************************/
+
+#define FILTER_BY_KERNEL_EXEC_CPT 1
+#define KERNEL_EXEC_CPT_UPPER_BOUND 1
+
+
+#define FILTER_BY_KERNEL_NAME 1
+#define KERNEL_NAME_FILTER "compute_stacey_acoustic_kernel"
+
+/******************************
  * Print full buffers to screen
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 0
-#define FULL_BUFFER_SIZE_LIMIT 750
-#define PRINT_FULL_PARAMS_TO_FILE 0
+#define PRINT_KERNEL_ARG_FULL_BUFFER 1
+#define FULL_BUFFER_SIZE_LIMIT 0
+#define PRINT_KERNEL_PARAMS_TO_FILE 1
 
 /******************************
  * MPI support                
@@ -45,8 +56,8 @@
  * Execution monitoring
  ******************************/
 
-#define ENABLE_KERNEL_PROFILING 1
-#define ENABLE_LEAK_DETECTION 1
+#define ENABLE_KERNEL_PROFILING 0
+#define ENABLE_LEAK_DETECTION 0
 
 /******************************
  ******************************

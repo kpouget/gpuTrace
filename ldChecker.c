@@ -258,13 +258,41 @@ void print_scalar_param_to_file (struct ld_kernel_s *ldKernel,
   
   SET_PARAM_FILE_NAME(ldKernel, ldParam, 0, filename);
   fp = fopen(filename, "w");
-  
   if (!fp) {
     perror("Failed to open file:");
     error("Failure with file %s", filename);
   }
 
   fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+
+  fclose (fp);
+}
+
+static void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
+                                         const struct work_size_s *work_sizes,
+                                         int work_dim)
+{
+  static char filename[80];
+  FILE *fp;
+  int i, j;
+  
+  sprintf(filename, "%s.problem_size", ldKernel->name);
+  
+  fp = fopen(filename, "w");
+  if (!fp) {
+    perror("Failed to open file:");
+    error("Failure with file %s", filename);
+  }
+  
+  for (i = 0; i < 2; i++) {
+    const size_t *work_size = i == 0 ? work_sizes->local : work_sizes->global;
+    
+    fprintf(fp, "<");
+    for (j = 0; j < work_dim; j++) {
+      fprintf(fp, "%zu%s", work_size[j], j != work_dim - 1 ? "," : "");
+    }
+    fprintf(fp, ">");
+  }
 
   fclose (fp);
 }
@@ -306,7 +334,7 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
     goto finish;
   }
 
-#if PRINT_FULL_PARAMS_TO_FILE == 1
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
   static char filename[80];
   SET_PARAM_FILE_NAME(ldKernel, ldParam, finish, filename);
   FILE *fp = fopen(filename, "w");
@@ -320,7 +348,7 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
   
   ptr = (char *) buffer;
   while (bytes_written < size) {
-#if PRINT_FULL_PARAMS_TO_FILE == 1
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
     fwrite (ptr, tsize, 1, fp);
 #else
     gpu_trace(print_a_number (ptr, type_info));
@@ -347,14 +375,14 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
 {
   int i, j;
   
-#ifdef FILTER_BY_KERNEL_EXEC_CPT
-  if (ldKernel->exec_counter >= FILTER_BY_KERNEL_EXEC_CPT) {
+#if FILTER_BY_KERNEL_EXEC_CPT == 1
+  if (ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {
     return;
   }
 #endif
 
-#ifdef FILTER_BY_KERNEL_NAME
-  if (strstr(ldKernel->name, FILTER_BY_KERNEL_NAME) == NULL) {
+#if FILTER_BY_KERNEL_NAME == 1
+  if (strstr(ldKernel->name, KERNEL_NAME_FILTER) == NULL) {
     return;
   }
 #endif
@@ -372,6 +400,10 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
       gpu_trace(">");
     }
     gpu_trace("(");
+
+#if PRINT_KERNEL_ARG_FULL_BUFFER == 1 && PRINT_KERNEL_PARAMS_TO_FILE == 1
+    print_kernel_problem_to_file(ldKernel, work_sizes, work_dim);
+#endif
   }
   
 #if PRINT_KERNEL_NAME_ONLY == 1
@@ -389,7 +421,7 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
 #if PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST != 1
     if (finish
         && (!ldKernel->params[i].is_pointer // (it's a scalar)
-            || strstr(ldKernel->params[i].type_info->type_name, "const ") != NULL // (it's a const buffer)
+            || strstr(ldKernel->params[i].type, "const ") != NULL // (it's a const buffer)
              ))
     {
       continue;
@@ -410,14 +442,15 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
     } else {
       gpu_trace(ldKernel->params[i].current_value);
     }
-#if PRINT_KERNEL_ARG_FULL_BUFFER
+    
+#if PRINT_KERNEL_ARG_FULL_BUFFER == 1
     if (ldKernel->params[i].is_pointer) {
       print_full_buffer(ldKernel, &ldKernel->params[i],
                         ldKernel->params[i].current_buffer,
                         ldKernel->params[i].type_info,
                         finish);
     }
-#if PRINT_FULL_PARAMS_TO_FILE == 1
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
     else if (!finish){
       print_scalar_param_to_file (ldKernel, &ldKernel->params[i]);
     }
@@ -426,6 +459,7 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
   }
   if (finish) {
     gpu_trace("\n);\n");
+    exit(0);
   }
 }
 #endif
@@ -481,16 +515,15 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
 #if PRINT_BUFFER_TRANSFER == 1
   {
     static int cpt = 0;
-    float *fptr = (float *) ptr;
-    int i;
-
-
-    gpu_trace("%d) Buffer #%d %s, %zub at +%zub: ", cpt++,
+   
+    gpu_trace("%d) Buffer #%d %s, %zub at +%zub", cpt++,
               ldBuffer->uid, is_read ? "read" : "written",
               size, offset);
 #if PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT
-    gpu_trace("{");
+    gpu_trace(": {");
     int firsts = 4;
+    int i;
+    float *fptr = (float *) ptr;
     for (i = 0; i < firsts; i++) {
       if (sizeof(float) * i >= size) {
         continue;
@@ -498,8 +531,9 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
       gpu_trace("%e, ", fptr[i]);
     }
     
-    gpu_trace("}\n");
+    gpu_trace("}");
 #endif
+    gpu_trace("\n");
   }
 #endif
   
