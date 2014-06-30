@@ -263,7 +263,9 @@ void print_scalar_param_to_file (struct ld_kernel_s *ldKernel,
     error("Failure with file %s", filename);
   }
 
-  fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+  if (!strstr("image2d_t", ldParam->type)) {
+    fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+  }
 
   fclose (fp);
 }
@@ -343,7 +345,7 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
 #else
   gpu_trace("\n");
 #endif
-  gpu_trace("\nWrite %s\n", filename);
+
   ptr = (char *) buffer;
   while (bytes_written < size) {
 #if PRINT_KERNEL_PARAMS_TO_FILE == 1
@@ -374,6 +376,9 @@ static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
   int i, j;
   
 #if FILTER_BY_KERNEL_EXEC_CPT == 1
+  if (ldKernel->exec_counter < KERNEL_EXEC_CPT_LOWER_BOUND) {
+    return;
+  }
   if (ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {
     return;
   }

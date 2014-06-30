@@ -30,11 +30,11 @@
  ******************************/
 
 #define FILTER_BY_KERNEL_EXEC_CPT 1
-#define KERNEL_EXEC_CPT_UPPER_BOUND 1
-
+#define KERNEL_EXEC_CPT_LOWER_BOUND 999
+#define KERNEL_EXEC_CPT_UPPER_BOUND 999
 
 #define FILTER_BY_KERNEL_NAME 1
-#define KERNEL_NAME_FILTER "compute_stacey_acoustic_kernel"
+#define KERNEL_NAME_FILTER "crust_mantle_impl_kernel_forward"
 
 /******************************
  * Print full buffers to screen
