@@ -311,9 +311,6 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
   char *ptr;
 
   if (ldBuffer->released || !ldBuffer->has_values) {
-    if (finish) {
-      return;
-    }
     size = 0;
   }
 
