@@ -445,6 +445,9 @@ cl_int clReleaseKernel (cl_kernel kernel) {
 int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                           size_t offset, size_t size)
 {
+  if (size == 0) {
+    return 1;
+  }
   //debug("*** Read %zub from buffer #%d at +%zub *** \n", size, ldBuffer->uid, offset);
   cl_int err = real_clEnqueueReadBuffer(ldOclEnv.command_queue,
                                         ldBuffer->handle, CL_TRUE,

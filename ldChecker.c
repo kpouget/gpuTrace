@@ -311,8 +311,10 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
   char *ptr;
 
   if (ldBuffer->released || !ldBuffer->has_values) {
-    gpu_trace("(nothing relevant apparently)");
-    return;
+    if (finish) {
+      return;
+    }
+    size = 0;
   }
 
 #if defined(FULL_BUFFER_SIZE_LIMIT) && FULL_BUFFER_SIZE_LIMIT != 0
@@ -330,7 +332,6 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
   if (!_callbacks.getBufferContent(ldBuffer, buffer, 0, size)) {
     warning("failed to retrieve the content of Buffer #%d\n",
             ldBuffer->uid);
-
     goto finish;
   }
 
@@ -345,7 +346,7 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
 #else
   gpu_trace("\n");
 #endif
-  
+  gpu_trace("\nWrite %s\n", filename);
   ptr = (char *) buffer;
   while (bytes_written < size) {
 #if PRINT_KERNEL_PARAMS_TO_FILE == 1
