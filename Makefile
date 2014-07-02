@@ -64,7 +64,7 @@ debug_ocl : $(OCL_SO_NAME)
 ### CUDA  ####
 ##############
 
-CUDA_DIR := /home/kevin/final/async.cuda/
+CUDA_DIR := /home/kevin/final/async.ocl/
 CUDA_APPLI := bin/xspecfem3D
 
 CUDA_BIN := $(CUDA_DIR)$(CUDA_APPLI)

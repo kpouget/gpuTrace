@@ -497,10 +497,6 @@ void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
       gpu_trace(">");
     }
     gpu_trace("(");
-
-#if PRINT_KERNEL_ARG_FULL_BUFFER == 1 && PRINT_KERNEL_PARAMS_TO_FILE == 1
-    print_kernel_problem_to_file(ldKernel, work_sizes, work_dim);
-#endif
   }
   
 #if PRINT_KERNEL_NAME_ONLY == 1
@@ -513,6 +509,11 @@ void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
   if (finish) {
     gpu_trace("\n%s----", SPACER);
   }
+#if PRINT_KERNEL_ARG_FULL_BUFFER == 1 && PRINT_KERNEL_PARAMS_TO_FILE == 1
+  else {
+    print_kernel_problem_to_file(ldKernel, work_sizes, work_dim);
+  }
+#endif
   
   for (i = 0; i < ldKernel->nb_params; i++) {
 #if PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST != 1

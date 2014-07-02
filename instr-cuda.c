@@ -43,10 +43,6 @@ struct ld_bindings_s cuda_bindings[] = {
   {NULL, NULL}
 };
 
-struct ld_stream_s {
-  cudaStream_t handle;
-};
-
 int cuda_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                            size_t offset, size_t size);
 static struct work_size_s *configure_get_worksizes(dim3 *gridDim, dim3 *blockDim);
@@ -55,7 +51,6 @@ static struct work_size_s *configure_get_worksizes(dim3 *gridDim, dim3 *blockDim
 
 CREATE_HASHMAP(mem, void*, 200)
 CREATE_HASHMAP(kernel, void*, 100)
-CREATE_HASHMAP(stream, cudaStream_t, 5)
 
 struct ld_mem_s *create_cuda_buffer(const void *devPtr, size_t size);
 
