@@ -382,23 +382,23 @@ static
 int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
 #if USE_ADVANCED_KERNEL_FILTER == 1
   static struct kernel_filter_s *kfilters = NULL;
-  
+
   if (!kfilters) {
     char *adv_kernel_filter = getenv(ENV__KERNEL_FILTER);
     char *kname_kcount;
     int nb_filters;
-      
+    
     {
       int i;
       char *s = adv_kernel_filter;
-      for (i = 0; *s; i += *s == '.', s++);
+      for (i = 0; *s; i += *s == ':', s++);
       nb_filters = i;
     }
-
+    warning("Init advanced filtering: %s (%d)\n", adv_kernel_filter, nb_filters);
     kfilters = malloc (sizeof (struct kernel_filter_s) * (nb_filters + 1));
     kfilters[nb_filters].kern_name = NULL;
     kfilters[nb_filters].exec_count = 0;
-    
+    nb_filters--;
     kname_kcount = strtok(adv_kernel_filter, ",");
     while (kname_kcount) {
       char *kname;
@@ -409,20 +409,21 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
       
       kname = kname_kcount;
       kcount = atoi(split + 1);
-      
+
+
       kfilters[nb_filters].kern_name = kname;
       kfilters[nb_filters].exec_count = kcount;
+      
+      printf("#%d)  %s --> %d\n", nb_filters, kname, kcount);
+
       nb_filters--;
-      
-      printf("%s --> %d\n", kname, kcount);
-      
       kname_kcount = strtok(NULL, ",");
     }
   }
   {
-    int i = 0;
+    int i;
     
-    while (kfilters[i].kern_name) {
+    for (i = 0; kfilters[i].kern_name; i++) {
       if (!strstr(ldKernel->name, kfilters[i].kern_name)) {
         continue;
       }
@@ -449,6 +450,7 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
   }
   
 #else
+  warning("nop")
 #if FILTER_BY_KERNEL_EXEC_CPT == 1
   if (ldKernel->exec_counter < KERNEL_EXEC_CPT_LOWER_BOUND ||
       ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {
@@ -479,7 +481,6 @@ void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
                                             int work_dim, int finish)
 {
   int i, j;
-  
   if (skip_kernel_printing(ldKernel)) {
     return;
   }
@@ -557,7 +558,6 @@ void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
   }
   if (finish) {
     gpu_trace("\n);\n");
-    exit(0);
   }
 }
 #endif
