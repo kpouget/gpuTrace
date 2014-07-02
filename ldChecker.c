@@ -1,15 +1,38 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "ldChecker.h"
 
 #define __USE_GNU
 #include <dlfcn.h>
 
-#define SET_PARAM_FILE_NAME(__kern__, __param__, __out__, __str__)      \
-  sprintf(__str__, "%s.%s.%s",                                          \
-          __kern__->name, __param__->name,                              \
+#define HAS_PARAM_TO_FILE_PREFIX()                      \
+  (getenv(ENV__PARAM_FILE_SUBDIR_PREFIX) != NULL)
+
+#define GET_PARAM_TO_FILE_PREFIX()             \
+  (HAS_PARAM_TO_FILE_PREFIX() ?               \
+   getenv(ENV__PARAM_FILE_SUBDIR_PREFIX) :     \
+   "")
+
+#define SET_PARAM_TO_FILE_SUITE_DIR(__dirname__, __kname__)             \
+  sprintf(dirname, "%s/%s",                                             \
+          PARAM_FILE_DIRECTORY,                                         \
+          __kname__)
+
+#define SET_PARAMS_TO_FILE_DIR(__dirname__, __ldKernel__)       \
+  sprintf(__dirname__, "%s/%s/%s%s%d",                          \
+          PARAM_FILE_DIRECTORY,                                 \
+          __ldKernel__->name,                                   \
+          GET_PARAM_TO_FILE_PREFIX(),                           \
+          HAS_PARAM_TO_FILE_PREFIX() ? "_" : "",                \
+          __ldKernel__->exec_counter)
+
+#define SET_PARAM_FILE_NAME(__str__, __dirname__, __param__, __out__)   \
+  sprintf(__str__, "%s/%s.%s",                                          \
+          __dirname__,                                                  \
+          __param__->name,                                              \
           __out__ ? "out" : "in")
 
 #define MAX_LEN_ONE_NUMBER 16
@@ -72,6 +95,10 @@ void init_ldchecker(struct callback_s callbacks, struct ld_bindings_s *lib_bindi
   
   _callbacks = callbacks;
 
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
+  mkdir(PARAM_FILE_DIRECTORY, PARAM_FILE_DIRECTORY_PERM);
+#endif
+  
   inited = 1;
 }
 
@@ -254,9 +281,12 @@ void print_scalar_param_to_file (struct ld_kernel_s *ldKernel,
                                  struct ld_kern_param_s *ldParam)
 {
   static char filename[80];
+  static char dirname[80];
   FILE *fp;
+
+  SET_PARAMS_TO_FILE_DIR(dirname, ldKernel);
+  SET_PARAM_FILE_NAME(filename, dirname, ldParam, 0);
   
-  SET_PARAM_FILE_NAME(ldKernel, ldParam, 0, filename);
   fp = fopen(filename, "w");
   if (!fp) {
     perror("Failed to open file:");
@@ -275,16 +305,20 @@ finish:
   fclose (fp);
 }
 
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
 static
 void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
                                          const struct work_size_s *work_sizes,
                                          int work_dim)
 {
   static char filename[80];
+  static char dirname[80];
   FILE *fp;
   int i, j;
-  
-  sprintf(filename, "%s.problem_size", ldKernel->name);
+
+  SET_PARAMS_TO_FILE_DIR(dirname, ldKernel);
+  mkdir (dirname, PARAM_FILE_DIRECTORY_PERM);
+  sprintf(filename, "%s/problem_size", dirname);
   
   fp = fopen(filename, "w");
   if (!fp) {
@@ -304,6 +338,8 @@ void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
 
   fclose (fp);
 }
+
+#endif
 
 void print_full_buffer(struct ld_kernel_s *ldKernel,
                        struct ld_kern_param_s *ldParam,
@@ -342,7 +378,12 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
 
 #if PRINT_KERNEL_PARAMS_TO_FILE == 1
   static char filename[80];
-  SET_PARAM_FILE_NAME(ldKernel, ldParam, finish, filename);
+  static char dirname[80];
+  
+  SET_PARAMS_TO_FILE_DIR(dirname, ldKernel);
+  
+  SET_PARAM_FILE_NAME(filename, dirname, ldParam, finish);
+  
   FILE *fp = fopen(filename, "w");
   if (!fp) {
     perror("Failed to open file:");
@@ -394,13 +435,13 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
       for (i = 0; *s; i += *s == ':', s++);
       nb_filters = i;
     }
-    warning("Init advanced filtering: %s (%d)\n", adv_kernel_filter, nb_filters);
     kfilters = malloc (sizeof (struct kernel_filter_s) * (nb_filters + 1));
     kfilters[nb_filters].kern_name = NULL;
     kfilters[nb_filters].exec_count = 0;
     nb_filters--;
     kname_kcount = strtok(adv_kernel_filter, ",");
     while (kname_kcount) {
+      static char dirname[80];
       char *kname;
       int kcount;
       char *split = strchr(kname_kcount, ':');
@@ -413,9 +454,10 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
 
       kfilters[nb_filters].kern_name = kname;
       kfilters[nb_filters].exec_count = kcount;
-      
-      printf("#%d)  %s --> %d\n", nb_filters, kname, kcount);
 
+      SET_PARAM_TO_FILE_SUITE_DIR(dirname, kname);
+      mkdir(dirname, PARAM_FILE_DIRECTORY_PERM);
+      
       nb_filters--;
       kname_kcount = strtok(NULL, ",");
     }
