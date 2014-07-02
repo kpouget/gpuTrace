@@ -29,6 +29,9 @@
  * Filters for kernel execution 
  ******************************/
 
+#define USE_ADVANCED_KERNEL_FILTER 1
+#define ENV__KERNEL_FILTER "LD_KERNEL_FILTER"
+
 #define FILTER_BY_KERNEL_EXEC_CPT 1
 #define KERNEL_EXEC_CPT_LOWER_BOUND 999
 #define KERNEL_EXEC_CPT_UPPER_BOUND 999

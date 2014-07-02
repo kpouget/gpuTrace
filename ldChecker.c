@@ -263,14 +263,20 @@ void print_scalar_param_to_file (struct ld_kernel_s *ldKernel,
     error("Failure with file %s", filename);
   }
 
-  if (!strstr("image2d_t", ldParam->type)) {
-    fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+  if (strstr("image2d_t", ldParam->type)) {
+    /* Quick hack: don't really consider (ocl) images as scalars.  */
+    /* Fix: add flag in type and handle them independenly.         */
+    goto finish;
   }
 
+  fwrite (ldParam->current_binary_value, ldParam->type_info->size, 1, fp);
+
+finish:
   fclose (fp);
 }
 
-static void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
+static
+void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
                                          const struct work_size_s *work_sizes,
                                          int work_dim)
 {
@@ -367,28 +373,116 @@ finish:
   free(buffer);
 }
 
-#if PRINT_KERNEL_BEFORE_EXEC == 1 || PRINT_KERNEL_AFTER_EXEC == 1
-#define SPACER "     "
-static void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
-                                            const struct work_size_s *work_sizes,
-                                            int work_dim, int finish)
-{
-  int i, j;
+struct kernel_filter_s {
+  const char *kern_name;
+  int exec_count;
+};
+
+static
+int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
+#if USE_ADVANCED_KERNEL_FILTER == 1
+  static struct kernel_filter_s *kfilters = NULL;
   
-#if FILTER_BY_KERNEL_EXEC_CPT == 1
-  if (ldKernel->exec_counter < KERNEL_EXEC_CPT_LOWER_BOUND) {
-    return;
+  if (!kfilters) {
+    char *adv_kernel_filter = getenv(ENV__KERNEL_FILTER);
+    char *kname_kcount;
+    int nb_filters;
+      
+    {
+      int i;
+      char *s = adv_kernel_filter;
+      for (i = 0; *s; i += *s == '.', s++);
+      nb_filters = i;
+    }
+
+    kfilters = malloc (sizeof (struct kernel_filter_s) * (nb_filters + 1));
+    kfilters[nb_filters].kern_name = NULL;
+    kfilters[nb_filters].exec_count = 0;
+    
+    kname_kcount = strtok(adv_kernel_filter, ",");
+    while (kname_kcount) {
+      char *kname;
+      int kcount;
+      char *split = strchr(kname_kcount, ':');
+      
+      *split = '\0';
+      
+      kname = kname_kcount;
+      kcount = atoi(split + 1);
+      
+      kfilters[nb_filters].kern_name = kname;
+      kfilters[nb_filters].exec_count = kcount;
+      nb_filters--;
+      
+      printf("%s --> %d\n", kname, kcount);
+      
+      kname_kcount = strtok(NULL, ",");
+    }
   }
-  if (ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {
-    return;
+  {
+    int i = 0;
+    
+    while (kfilters[i].kern_name) {
+      if (!strstr(ldKernel->name, kfilters[i].kern_name)) {
+        continue;
+      }
+
+      if (kfilters[i].exec_count != ldKernel->exec_counter) {
+        continue;
+      }
+      /* Name and count match.  */
+      goto dont_skip;
+    }
+
+    /* No match, default behaviour(s):  */
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
+    goto do_skip;
+#else
+    /* If no filter at all, print all.  */
+    if (!kfilters[0].kern_name) {
+      goto dont_skip;
+    } else {
+      goto do_skip;
+    }    
+#endif
+    
+  }
+  
+#else
+#if FILTER_BY_KERNEL_EXEC_CPT == 1
+  if (ldKernel->exec_counter < KERNEL_EXEC_CPT_LOWER_BOUND ||
+      ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {
+    goto do_skip;
   }
 #endif
 
 #if FILTER_BY_KERNEL_NAME == 1
   if (strstr(ldKernel->name, KERNEL_NAME_FILTER) == NULL) {
-    return;
+    goto do_skip;
   }
 #endif
+#endif
+
+  goto dont_skip; // appease compiler warning
+dont_skip:
+  return 0;
+  
+do_skip:
+  return 1;
+}
+
+#if PRINT_KERNEL_BEFORE_EXEC == 1
+#define SPACER "     "
+static
+void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
+                                            const struct work_size_s *work_sizes,
+                                            int work_dim, int finish)
+{
+  int i, j;
+  
+  if (skip_kernel_printing(ldKernel)) {
+    return;
+  }
   
   if (!finish) {
     gpu_trace("%d@%s", ldKernel->exec_counter, ldKernel->name);

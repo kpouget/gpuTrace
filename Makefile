@@ -48,7 +48,7 @@ MPI_RUN = #mpirun -n 6 -x
 SERGE_OCL_DIR := ~/travail/sample/OpenCL/Apriori_GPU/
 SERGE_OCL_APPLI := ./AprioriPBI src/chess.dat 3000
 
-SPECFEM_OCL_DIR := /home/$(USER)/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
+SPECFEM_OCL_DIR := /home/kevin/travail/sample/specfem-testsuite/specfem-opencl/ #/home/kevin/travail/sample/specfem-build
 SPECFEM_OCL_APPLI := bin/xspecfem3D
 
 OCL_DIR := $(SPECFEM_OCL_DIR)
