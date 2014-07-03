@@ -160,7 +160,7 @@ void init_ocl_ldchecker(void) {
   
   init_ldchecker(callbacks, ocl_bindings);
   create_ocl_buffer(NULL);
-  init_helper();
+  ocl_init_helper();
 }
 
 void UNUSED sig_handler(int signum) {
@@ -271,7 +271,7 @@ cl_program clCreateProgramWithSource (cl_context context,
     return program->handle;
   }
   
-  handle_program(program->handle, count, strings, lengths);
+  ocl_handle_program(program->handle, count, strings, lengths);
   
   return program->handle;
 }
@@ -413,7 +413,7 @@ cl_kernel clCreateKernel (cl_program  program,
     return ldKernel->handle;
   }
     
-  types_and_names = handle_create_kernel(program, ldKernel->handle, kernel_name);
+  types_and_names = ocl_handle_create_kernel(program, ldKernel->handle, kernel_name);
   for (nb_params = 0; types_and_names[nb_params]; nb_params++);
   nb_params /= 2;
 

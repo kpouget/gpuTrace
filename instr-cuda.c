@@ -43,11 +43,13 @@ struct ld_bindings_s cuda_bindings[] = {
   {NULL, NULL}
 };
 
+#include "cuda_helper.h"
+
+static struct kernel_lookup_s *cuda_lookup_table;
+
 int cuda_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                            size_t offset, size_t size);
 static struct work_size_s *configure_get_worksizes(dim3 *gridDim, dim3 *blockDim);
-
-#include "cuda_kernel_instruments_gen.c"
 
 CREATE_HASHMAP(mem, void*, 200)
 CREATE_HASHMAP(kernel, void*, 100)
@@ -64,11 +66,13 @@ static void init_cuda_ldchecker(void) {
   }
 
   init_ldchecker(callbacks, cuda_bindings);
+  cuda_init_helper();
   
   inited = 1;
-  
-  for (i = 0; i < NB_CUDA_KERNEL; i++) {
-    struct kernel_lookup_s *kernel = &function_lookup_table[i];
+
+  cuda_lookup_table = cuda_get_lookup_table();
+  for (i = 0; cuda_lookup_table[i].address != NULL; i++) {
+    struct kernel_lookup_s *kernel = &cuda_lookup_table[i];
     struct ld_kernel_s *ldKernel = get_next_kernel_spot();
 
     ldKernel->handle = kernel;
@@ -154,18 +158,18 @@ cudaError_t cudaLaunch (const void *entry) {
   struct kernel_lookup_s *kernel;
   cudaError_t err;
   int i;
-  
-  for (i = 0; i < NB_CUDA_KERNEL; i++) {
-    if (function_lookup_table[i].address == entry) {
+
+  for (i = 0; cuda_lookup_table[i].address != NULL; i++) {
+    if (cuda_lookup_table[i].address == entry) {
       break;
     }
   }
-  if (i == NB_CUDA_KERNEL) {
-    warning("Couldn't find kernel @%p", entry);
+  if (!cuda_lookup_table[i].address) {
+    warning("Couldn't find kernel @%p\n", entry);
     goto error;
   }
 
-  kernel = &function_lookup_table[i];
+  kernel = &cuda_lookup_table[i];
   ldKernel = find_kernel_entry(kernel);
   assert(ldKernel);
 

@@ -33,10 +33,10 @@
 #define ENV__KERNEL_FILTER "LD_KERNEL_FILTER"
 
 #define FILTER_BY_KERNEL_EXEC_CPT 1
-#define KERNEL_EXEC_CPT_LOWER_BOUND 999
-#define KERNEL_EXEC_CPT_UPPER_BOUND 999
+#define KERNEL_EXEC_CPT_LOWER_BOUND 0
+#define KERNEL_EXEC_CPT_UPPER_BOUND 5
 
-#define FILTER_BY_KERNEL_NAME 1
+#define FILTER_BY_KERNEL_NAME 0
 #define KERNEL_NAME_FILTER "crust_mantle_impl_kernel_forward"
 
 /******************************
@@ -44,9 +44,9 @@
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_PARAMS_TO_FILE 1
+#define PRINT_KERNEL_PARAMS_TO_FILE 0
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 1
+#define PRINT_KERNEL_ARG_FULL_BUFFER 0
 #define FULL_BUFFER_SIZE_LIMIT 0
 
 #define PARAM_FILE_DIRECTORY "kernel_test_data"

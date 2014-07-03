@@ -3,6 +3,7 @@
 import subprocess
 import re
 import sys
+import os
 
 SPLITTER = "CUT-CUT-CUT"
 GDB_COMMAND = ["gdb", "-ex", "set filename-display absolute", "-ex", 'printf "{}\n"'.format(SPLITTER),  '-quiet']
@@ -11,6 +12,7 @@ LIST_KERNELS = ["-ex", 'info functions __device_stub__']
 QUIT = ['-ex', 'quit']
 
 def get_cuda_kernel_prototypes(binary):
+    os.putenv("LD_PRELOAD", "")
     output = subprocess.Popen(GDB_COMMAND + [binary] + LIST_KERNELS + QUIT,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
     

@@ -14,7 +14,7 @@ SO_LDFLAGS := -fPIC -rdynamic -shared  $(PY_LDFLAGS)
 CFLAGS := -g -O0 -std=gnu99 -Werror -Wall -pedantic -Wno-format-security $(MPI_INC)
 
 OCL_LD_PRELOAD_ENV := LD_PRELOAD=$(CWD_DIR)/$(OCL_SO_NAME):libpython3.3m.so
-CUDA_LD_PRELOAD_ENV := LD_PRELOAD=$(CWD_DIR)/$(CUDA_SO_NAME)
+CUDA_LD_PRELOAD_ENV := LD_PRELOAD=$(CWD_DIR)/$(CUDA_SO_NAME):libpython3.3m.so
 
 all : $(OCL_SO_NAME) # $(CUDA_SO_NAME)
 
@@ -24,13 +24,13 @@ all : $(OCL_SO_NAME) # $(CUDA_SO_NAME)
 
 PYTHON_MOD_PATH=$(shell pwd)
 
-$(OCL_SO_NAME) : instr-ocl.o ocl_helper_py.o ldChecker.o
+$(OCL_SO_NAME) : instr-ocl.o gpu_helper_py.o ldChecker.o
 	gcc -o $@ $^ $(SO_LDFLAGS)
 
 instr-ocl.o : instr-ocl.c ocl_helper.h ldChecker.h
 	gcc -o $@ -c $< $(CFLAGS) $(SO_CFLAGS)
 
-ocl_helper_py.o : ocl_helper_py.c ocl_helper.h
+gpu_helper_py.o : gpu_helper_py.c cuda_helper.h ocl_helper.h
 	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS) $(SO_CFLAGS) -DPYTHON_MOD_PATH=$(PYTHON_MOD_PATH)
 
 ldChecker.o : ldChecker.c ldChecker.h
@@ -79,17 +79,14 @@ INSTR_CFLAGS := -finstrument-functions
 NV_INSTR := --compiler-options $(INSTR_CFLAGS)
 NV_TEMP_CFLAGS = --keep-dir=int --keep 
 
-cuda_kernel_instruments_gen.c : preprocess.py $(CUDA_BIN)
-	python3 $< $(CUDA_BIN) > $@
-	sed -i 's/realw_const_p/const float */g' $@
-	sed -i 's/realw_p/float \*/g' $@
-	sed -i 's/realw\*/float \*/g' $@
-	sed -i 's/realw/float/g' $@
-	sed -i 's/int\*/int \*/g' $@
-	sed -i 's/\* /\*/g' $@
+#CUDA_HELPER = cuda_helper_preprocessed.c
+CUDA_HELPER = gpu_helper_py.o
 
-$(CUDA_SO_NAME) : instr-cuda.c cuda_kernel_instruments_gen.c ldChecker.o 
-	gcc -o $@ $< ldChecker.o $(CFLAGS) $(SO_CFLAGS) $(SO_LDFLAGS) $(CUDA_CFLAGS)
+cuda_helper_preprocessed.c : cuda_helper_preprocessor.py $(CUDA_BIN)
+	python3 $< $(CUDA_BIN) > $@
+
+$(CUDA_SO_NAME) : instr-cuda.c $(CUDA_HELPER) ldChecker.o 
+	gcc -o $@ $< ldChecker.o $(CUDA_HELPER)  $(CFLAGS) $(SO_CFLAGS) $(SO_LDFLAGS) $(CUDA_CFLAGS)
 
 CUDA_EXAMPLE_CFLAGS := ${CFLAGS}
 CUDA_EXAMPLE_CFLAGS := $(shell echo "${CUDA_EXAMPLE_CFLAGS}" | sed -e 's/-std=gnu99//g')

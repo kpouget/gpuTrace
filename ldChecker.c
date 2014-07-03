@@ -427,20 +427,21 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
   if (!kfilters) {
     char *adv_kernel_filter = getenv(ENV__KERNEL_FILTER);
     char *kname_kcount;
-    int nb_filters;
+    int nb_filters = 0;
     
-    {
+    if (adv_kernel_filter) {
       int i;
       char *s = adv_kernel_filter;
       for (i = 0; *s; i += *s == ':', s++);
       nb_filters = i;
     }
+    
     kfilters = malloc (sizeof (struct kernel_filter_s) * (nb_filters + 1));
     kfilters[nb_filters].kern_name = NULL;
     kfilters[nb_filters].exec_count = 0;
     nb_filters--;
     kname_kcount = strtok(adv_kernel_filter, ",");
-    while (kname_kcount) {
+    while (nb_filters > 0) {
       static char dirname[80];
       char *kname;
       int kcount;
@@ -492,7 +493,6 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
   }
   
 #else
-  warning("nop")
 #if FILTER_BY_KERNEL_EXEC_CPT == 1
   if (ldKernel->exec_counter < KERNEL_EXEC_CPT_LOWER_BOUND ||
       ldKernel->exec_counter > KERNEL_EXEC_CPT_UPPER_BOUND) {

@@ -2,31 +2,24 @@
 
 import sys
 import os
+import collections
 
-try:
-    import gdb_helper
-except:
-    pass
-
-def get_prog_lines():
-    with open("kern") as fkern:
-        for line in fkern:
-            yield line
+import gdb_helper
 
 programs = {}
-def prepare_program(uid, lines):
+def ocl_prepare_program(uid, lines):
     progr_lines = []
     for line in lines:
         progr_lines += line.split("\n")
     programs[uid] = progr_lines
             
-def parse_ocl(program_uid, kernel_name):
+def ocl_parse(program_uid, kernel_name):
     def get_lines():
         yield from programs[program_uid]
 
     return parse(get_lines(), kernel_name)
 
-def parse_cuda(source_name, kernel_name):
+def cuda_parse(source_name, kernel_name):
     def get_lines():
         with open(source_name, "r") as fsource:
             yield from fsource.readlines()
@@ -78,6 +71,27 @@ def parse(lines, kernel_name):
 
     return parameters
 
+def cuda_get_raw_lookup_table(binary=None):
+    lookup_table = collections.OrderedDict()
+    for addr, info in cuda_get_lookup_table(binary).items():
+        # convert str(addr) to int
+        lookup_table[int(addr, 16)] = info
+
+    return lookup_table
+
+def cuda_get_lookup_table(binary=None):
+    if binary is None:
+        binary = os.readlink("/proc/self/exe")
+    lookup_table = collections.OrderedDict()
+    
+    symbols = gdb_helper.get_cuda_kernel_names(binary)
+
+    for symb, loc, address in gdb_helper.get_symbol_location(symbols, binary):
+        params = cuda_parse(loc, symb)
+        lookup_table[address] = symb, params
+        
+    return lookup_table
+
 
 if __name__ == "__main__":
     binary = sys.argv[1] if len(sys.argv) > 1 else "./hello"
@@ -85,4 +99,4 @@ if __name__ == "__main__":
     
     for symb, loc, address in gdb_helper.get_symbol_location(symbols):
         print(symb)
-        print(parse_cuda(loc, symb))
+        print(cuda_parse(loc, symb))
