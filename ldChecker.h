@@ -180,14 +180,14 @@ void gpu_trace(const char *format, ...);
                                        __FILE__, __LINE__,  __func__);}}
 
 #define CREATE_HASHMAP(_NAME, _KEY_TYPE,_MAX_KEYS)                      \
-  struct ld_##_NAME##_s _NAME##_map[_MAX_KEYS];                         \
-  unsigned int _NAME##_elt_count = 0;                                   \
+  static struct ld_##_NAME##_s _NAME##_map[_MAX_KEYS];                  \
+  static unsigned int _NAME##_elt_count = 0;                            \
                                                                         \
-  int find_##_NAME##_entry_id (_KEY_TYPE key);                          \
-  struct ld_##_NAME##_s *get_##_NAME##_entry (int id);                  \
-  struct ld_##_NAME##_s *find_##_NAME##_entry(_KEY_TYPE key);           \
-  struct ld_##_NAME##_s *get_next_##_NAME##_spot(void);                 \
-  int add_to_##_NAME##_map (_KEY_TYPE key);                             \
+  static int find_##_NAME##_entry_id (_KEY_TYPE key);                   \
+  static struct ld_##_NAME##_s *get_##_NAME##_entry (int id);           \
+  static struct ld_##_NAME##_s *find_##_NAME##_entry(_KEY_TYPE key);    \
+  static struct ld_##_NAME##_s *get_next_##_NAME##_spot(void);          \
+  static int add_to_##_NAME##_map (_KEY_TYPE key);                      \
                                                                         \
   int find_##_NAME##_entry_id (_KEY_TYPE key) {                         \
     int i;                                                              \
@@ -199,16 +199,16 @@ void gpu_trace(const char *format, ...);
     return -1;                                                          \
   }                                                                     \
                                                                         \
-  inline struct ld_##_NAME##_s *get_##_NAME##_entry (int id) {          \
+  static inline struct ld_##_NAME##_s *get_##_NAME##_entry (int id) {   \
     return (id < _NAME##_elt_count && id >= 0 ?                         \
             &_NAME##_map[id] : NULL);                                   \
   }                                                                     \
                                                                         \
-  inline struct ld_##_NAME##_s *find_##_NAME##_entry(_KEY_TYPE key) {   \
+  static inline struct ld_##_NAME##_s *find_##_NAME##_entry(_KEY_TYPE key) { \
     return get_##_NAME##_entry(find_##_NAME##_entry_id (key));          \
   }                                                                     \
                                                                         \
-  inline struct ld_##_NAME##_s *get_next_##_NAME##_spot(void) {         \
+  static inline struct ld_##_NAME##_s *get_next_##_NAME##_spot(void) {  \
     if (_NAME##_elt_count >= _MAX_KEYS) {                               \
       return NULL;                                                      \
     }                                                                   \
@@ -216,7 +216,7 @@ void gpu_trace(const char *format, ...);
     return &_NAME##_map[_NAME##_elt_count++];                           \
   }                                                                     \
                                                                         \
-  inline int add_to_##_NAME##_map (_KEY_TYPE key) {                    \
+  static inline int add_to_##_NAME##_map (_KEY_TYPE key) {              \
     struct ld_##_NAME##_s *next;                                        \
       next = get_next_##_NAME##_spot();                                 \
         if (!next) {                                                    \
