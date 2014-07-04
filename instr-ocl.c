@@ -461,10 +461,10 @@ int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
     return 1;
   }
   //debug("*** Read %zub from buffer #%d at +%zub *** \n", size, ldBuffer->uid, offset);
-  cl_int err = real_clEnqueueWriteBuffer(ldOclEnv.command_queue,
-                                         ldBuffer->handle, CL_TRUE,
-                                         offset, size, buffer,
-                                         0, NULL, NULL);
+  cl_int err = real_clEnqueueReadBuffer(ldOclEnv.command_queue,
+                                        ldBuffer->handle, CL_TRUE,
+                                        offset, size, buffer,
+                                        0, NULL, NULL);
   assert(err == CL_SUCCESS);
     
   return err == CL_SUCCESS;
@@ -489,7 +489,7 @@ void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
     size = sizeof(cl_mem);
   }
     
-  warning("set param %s to %u\n", ldParam->name, *(unsigned int *) buffer);
+  warning("set param %s to %p\n", ldParam->name, *(char *) buffer);
 
   clCheck(real_clSetKernelArg ((cl_kernel) ldKernel->handle, ldParam->index,
                                size, buffer));

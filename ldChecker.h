@@ -9,9 +9,9 @@
  * are traced.
  ******************************/
 
-#define PRINT_KERNEL_BUFFER_CREATION 1
+#define PRINT_KERNEL_BUFFER_CREATION 0
 #define PRINT_BUFFER_DIRECTION 0
-#define PRINT_BUFFER_TRANSFER 1
+#define PRINT_BUFFER_TRANSFER 0
 #define PRINT_BUFFER_RELEASE 0
 
 #define PRINT_KERNEL_BEFORE_EXEC 1
@@ -21,7 +21,7 @@
 
 #define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 1
 
-#define BUFFER_ZERO_IS_NULL 1
+#define BUFFER_ZERO_IS_NULL 0
 
 #define FORCE_FINISH_KERNEL 0
 
@@ -44,9 +44,9 @@
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_PARAMS_TO_FILE 1
+#define PRINT_KERNEL_PARAMS_TO_FILE 0
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 1
+#define PRINT_KERNEL_ARG_FULL_BUFFER 0
 #define FULL_BUFFER_SIZE_LIMIT 0
 
 #define PARAM_FILE_DIRECTORY "kernel_test_data"

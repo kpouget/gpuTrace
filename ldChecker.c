@@ -162,6 +162,7 @@ int validate_buffer_content(const unsigned char *act_buffer, const unsigned char
   int i;
   for (i = 0; i < sz; i++) {
     if (act_buffer[i] != ref_buffer[i]) {
+      warning("error at %d\n", i);
       return 0;
     }
   }
@@ -247,7 +248,7 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
     
     SET_PARAM_FILE_NAME(filename, dirname, ldParam, 1);
     fp = fopen(filename, "r");
-    
+    warning("read from %s\n", filename);
     if (!fp) {
       continue;
     }
@@ -273,8 +274,6 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
   }
   
   free(gpu_buffer_handles);
-  exit(0);
-  
 }
 #endif
 
