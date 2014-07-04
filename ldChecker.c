@@ -442,7 +442,6 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
     nb_filters--;
     kname_kcount = strtok(adv_kernel_filter, ",");
     while (nb_filters > 0) {
-      static char dirname[80];
       char *kname;
       int kcount;
       char *split = strchr(kname_kcount, ':');
@@ -452,12 +451,8 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
       kname = kname_kcount;
       kcount = atoi(split + 1);
 
-
       kfilters[nb_filters].kern_name = kname;
       kfilters[nb_filters].exec_count = kcount;
-
-      SET_PARAM_TO_FILE_SUITE_DIR(dirname, kname);
-      mkdir(dirname, PARAM_FILE_DIRECTORY_PERM);
       
       nb_filters--;
       kname_kcount = strtok(NULL, ",");
@@ -509,6 +504,15 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
 
   goto dont_skip; // appease compiler warning
 dont_skip:
+
+#if PRINT_KERNEL_PARAMS_TO_FILE == 1
+  {
+    static char dirname[80];
+    
+    SET_PARAM_TO_FILE_SUITE_DIR(dirname, ldKernel->name);
+    mkdir(dirname, PARAM_FILE_DIRECTORY_PERM);
+  }
+#endif
   return 0;
   
 do_skip:
