@@ -83,6 +83,7 @@ static void init_cuda_ldchecker(void) {
     for (j = 0; j < ldKernel->nb_params; j++) {
       ldKernel->params[j].name = kernel->params[j].name;
       ldKernel->params[j].type = kernel->params[j].type;
+      ldKernel->params[i].index = j;
     }
     
     kernel_created_event(ldKernel);

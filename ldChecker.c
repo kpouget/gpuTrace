@@ -145,6 +145,139 @@ void buffer_created_event(struct ld_mem_s *ldBuffer) {
 #endif
 }
 
+#if ENABLE_KERNEL_TESTING == 1
+static
+size_t get_fsize(FILE *fp) {
+  size_t sz = 0;
+  
+  fseek(fp, 0L, SEEK_END);
+  sz = ftell(fp);
+  fseek(fp, 0L, SEEK_SET);
+
+  return sz;
+}
+
+static
+int validate_buffer_content(const unsigned char *act_buffer, const unsigned char *ref_buffer, size_t sz) {
+  int i;
+  for (i = 0; i < sz; i++) {
+    if (act_buffer[i] != ref_buffer[i]) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+#define MAX_LINE_LENGTH 256
+static
+void kernel_run_tests(struct ld_kernel_s *ldKernel) {
+  static char filename[80];
+  static char dirname[80];
+  
+  char *line;
+  FILE *fp;
+  size_t sz = 0;
+  int arg_index;
+  void **gpu_buffer_handles = malloc(sizeof(void *) * ldKernel->nb_params);
+  struct work_size_s work_sizes;
+  unsigned int work_dim;
+  
+  // force it now, discover it next time
+  ldKernel->exec_counter = 3;
+  
+  SET_PARAMS_TO_FILE_DIR(dirname, ldKernel);
+  mkdir (dirname, PARAM_FILE_DIRECTORY_PERM);
+  sprintf(filename, "%s/problem_size", dirname);
+
+  fp = fopen(filename, "r");
+  getline (&line, &sz, fp); //  eg: <1,32><1,1>
+  {
+    int loc_glob, dim;
+    char *line_pos = line;
+    
+    for (loc_glob = 0; loc_glob < 2; loc_glob++) {
+      size_t *work_size = loc_glob == 0 ? work_sizes.local : work_sizes.global;
+      
+      line_pos++; // eat first '<'
+      dim = 0;
+      while (1) {
+        work_size[dim] = atoi(line_pos);
+        while (isdigit(*line_pos)) line_pos++; // eat 1 size
+        if (*line_pos == '>') {
+          line_pos++;
+          break; // cont to next dim
+        }
+        assert(*line_pos == ',');
+        line_pos++; // eat the 'n'
+        dim++;
+      }
+    }
+
+    work_dim = dim;
+  }
+  
+  free(line);
+  fclose(fp);
+  
+  for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
+    struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
+    unsigned char *buffer;
+    
+    SET_PARAM_FILE_NAME(filename, dirname, ldParam, 0);
+    fp = fopen(filename, "r");
+    sz = get_fsize(fp);
+
+    buffer = malloc(sz);
+    fread(buffer, sizeof(char), sz, fp);
+    
+    /* check if buffer is correctly read */
+    
+    gpu_buffer_handles[arg_index] = _callbacks.setParameterValue(ldKernel, ldParam, buffer, sz);
+    
+    free(buffer);
+    fclose(fp);
+  }
+
+  _callbacks.triggerKernelExecution(ldKernel, &work_sizes, work_dim);
+
+  for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
+    struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
+    unsigned char *ref_buffer;
+    unsigned char *act_buffer;
+    
+    SET_PARAM_FILE_NAME(filename, dirname, ldParam, 1);
+    fp = fopen(filename, "r");
+    
+    if (!fp) {
+      continue;
+    }
+    
+    sz = get_fsize(fp);
+
+    ref_buffer = malloc(sz);
+    act_buffer = malloc(sz);
+    
+    _callbacks.getAndReleaseParameterValue(ldKernel, ldParam, gpu_buffer_handles[arg_index],
+                                           act_buffer, sz);
+    fread(ref_buffer, sizeof(char), sz, fp);
+    
+    if (!validate_buffer_content(act_buffer, ref_buffer, sz)) {
+      warning("Content of buffer %s doesn't match reference\n", ldParam->name);
+    } else {
+      warning("Content of buffer %s seems good :-)\n", ldParam->name);
+    }
+    
+    free(ref_buffer);
+    free(act_buffer);
+    fclose(fp);
+  }
+  
+  free(gpu_buffer_handles);
+  exit(0);
+  
+}
+#endif
+
 void kernel_created_event(struct ld_kernel_s *ldKernel) {
   int i;
 #if PRINT_KERNEL_BUFFER_CREATION == 1
@@ -164,6 +297,10 @@ void kernel_created_event(struct ld_kernel_s *ldKernel) {
   ldKernel->exec_counter = 0;
 #if ENABLE_KERNEL_PROFILING == 1
   ldKernel->exec_span_ns = 0;
+#endif
+
+#if ENABLE_KERNEL_TESTING == 1
+  kernel_run_tests(ldKernel);
 #endif
 }
 
@@ -610,7 +747,7 @@ void kernel_print_current_parameters(struct ld_kernel_s *ldKernel,
 
 void kernel_executed_event(struct ld_kernel_s *ldKernel,
                            const struct work_size_s *work_sizes,
-                           int work_dim)
+                           unsigned int work_dim)
 {
   int i;
   
@@ -643,6 +780,8 @@ void kernel_finished_event(struct ld_kernel_s *ldKernel,
 void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
                        size_t size, size_t offset)
 {
+  size_t size_to_read;
+  
   if (!is_read && ldBuffer->flags & LD_FLAG_WRITE_ONLY) {
     warning("writing in write-only buffer#%d\n", ldBuffer->uid);
   }
@@ -650,9 +789,9 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
     warning("reading in read-only buffer #%d\n", ldBuffer->uid);
   }
 
-  size = FIRST_BYTES_TO_READ < size ? FIRST_BYTES_TO_READ : size;
+  size_to_read = FIRST_BYTES_TO_READ < size ? FIRST_BYTES_TO_READ : size;
   //need to pay attention to offset
-  memcpy(ldBuffer->first_values, ptr, size);
+  memcpy(ldBuffer->first_values, ptr, size_to_read);
   ldBuffer->has_values = 1;
   ldBuffer->values_outdated = 0;
   
@@ -667,12 +806,12 @@ void buffer_copy_event(struct ld_mem_s *ldBuffer, int is_read, void **ptr,
     gpu_trace(": {");
     int firsts = 4;
     int i;
-    float *fptr = (float *) ptr;
+    unsigned int *fptr = (unsigned int *) ptr;
     for (i = 0; i < firsts; i++) {
-      if (sizeof(float) * i >= size) {
+      if (sizeof(unsigned int) * i >= size) {
         continue;
       }
-      gpu_trace("%e, ", fptr[i]);
+      gpu_trace("%u, ", fptr[i]);
     }
     
     gpu_trace("}");

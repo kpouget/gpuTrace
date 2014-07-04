@@ -147,10 +147,21 @@ static void print_statistics(int force);
 
 int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                           size_t offset, size_t size);
+int ocl_triggerKernelExecution (struct ld_kernel_s *ldKernel,
+                                const struct work_size_s *work_sizes,
+                                unsigned int work_dim);
+void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
+                             struct ld_kern_param_s *ldParam,
+                             void *buffer,  size_t size);
+int ocl_getAndReleaseParameterValue (struct ld_kernel_s *ldKernel,
+                                     struct ld_kern_param_s *ldParam,
+                                     void *buffer_handle,
+                                     void *buffer, size_t size);
+
 struct ld_mem_s *create_ocl_buffer (cl_mem handle);
 
 void init_ocl_ldchecker(void) {
-  struct callback_s callbacks = {ocl_getBufferContent};
+  struct callback_s callbacks = {ocl_getBufferContent, ocl_setParameterValue, ocl_getAndReleaseParameterValue, ocl_triggerKernelExecution};
   
 #if ENABLE_KERNEL_PROFILING == 1
   pthread_mutex_init(&stats_lock, NULL);
@@ -423,6 +434,7 @@ cl_kernel clCreateKernel (cl_program  program,
   for (i = 0; i < nb_params; i++) {    
     ldKernel->params[i].name = types_and_names[i*2 + 1];
     ldKernel->params[i].type = types_and_names[i*2];
+    ldKernel->params[i].index = i;
   }
 
   kernel_created_event(ldKernel);
@@ -449,13 +461,81 @@ int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
     return 1;
   }
   //debug("*** Read %zub from buffer #%d at +%zub *** \n", size, ldBuffer->uid, offset);
-  cl_int err = real_clEnqueueReadBuffer(ldOclEnv.command_queue,
-                                        ldBuffer->handle, CL_TRUE,
-                                        offset, size, buffer,
-                                        0, NULL, NULL);
+  cl_int err = real_clEnqueueWriteBuffer(ldOclEnv.command_queue,
+                                         ldBuffer->handle, CL_TRUE,
+                                         offset, size, buffer,
+                                         0, NULL, NULL);
   assert(err == CL_SUCCESS);
     
   return err == CL_SUCCESS;
+}
+
+void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
+                             struct ld_kern_param_s *ldParam,
+                             void *buffer,  size_t size)
+{
+  cl_mem mem_obj = (void *) -1;
+  cl_int errcode_ret;
+
+  if (ldParam->is_pointer) {
+    mem_obj = real_clCreateBuffer(ldOclEnv.context, CL_MEM_READ_WRITE, size, NULL, clck_(&errcode_ret));
+
+    clCheck(real_clEnqueueWriteBuffer(ldOclEnv.command_queue,
+                                      (cl_mem) mem_obj,
+                                      CL_TRUE,
+                                      0, size, buffer,
+                                      0, NULL, NULL));
+    buffer = &mem_obj;
+    size = sizeof(cl_mem);
+  }
+    
+  warning("set param %s to %u\n", ldParam->name, *(unsigned int *) buffer);
+
+  clCheck(real_clSetKernelArg ((cl_kernel) ldKernel->handle, ldParam->index,
+                               size, buffer));
+
+  return mem_obj;
+    
+}
+
+int ocl_triggerKernelExecution (struct ld_kernel_s *ldKernel,
+                                const struct work_size_s *work_sizes,
+                                unsigned int work_dim)
+{
+  static size_t global_work_size[MAX_WORK_DIM], local_work_size[MAX_WORK_DIM];
+  int i;
+
+  for (i = 0; i < work_dim; i++) {
+    local_work_size[i] = work_sizes->local[i];
+    global_work_size[i] = work_sizes->global[i]/work_sizes->local[i];
+  }
+  
+  clCheck(real_clEnqueueNDRangeKernel(ldOclEnv.command_queue, (cl_kernel) ldKernel->handle,
+                                      work_dim, NULL,
+                                      global_work_size,
+                                      local_work_size,
+                                      0, NULL, NULL));
+  return 1;
+}
+
+int ocl_getAndReleaseParameterValue (struct ld_kernel_s *ldKernel,
+                                       struct ld_kern_param_s *ldParam,
+                                       void *buffer_handle,
+                                       void *buffer,  size_t size)
+{
+  if (buffer_handle == (void *) -1) {
+    return 1;
+  }
+
+  clCheck(real_clEnqueueReadBuffer(ldOclEnv.command_queue,
+                                   (cl_mem) buffer_handle,
+                                   CL_TRUE,
+                                   0, size, buffer,
+                                   0, NULL, NULL));
+  
+  clCheck(real_clReleaseMemObject((cl_mem) buffer_handle));
+  
+  return 1;
 }
 
 cl_int clSetKernelArg (cl_kernel kernel,
@@ -513,7 +593,7 @@ static void CL_CALLBACK  kernel_profiler_cb (cl_event event,
   }
 
   if (tstart == 0ul || tstop == 0ul) {
-    //printf("suspicious timespan: %lu for %s/%d (%lu to %lu) -- %d\n", len, ldKernel->name, ldKernel->exec_counter, tstart, tstop, refcnt);
+    // invalid timestamps
     len = 0;
   }
 

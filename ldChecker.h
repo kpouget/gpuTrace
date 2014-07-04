@@ -3,15 +3,15 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include <ctype.h>
 /******************************
  * Select what and when info 
  * are traced.
  ******************************/
 
-#define PRINT_KERNEL_BUFFER_CREATION 0
+#define PRINT_KERNEL_BUFFER_CREATION 1
 #define PRINT_BUFFER_DIRECTION 0
-#define PRINT_BUFFER_TRANSFER 0
+#define PRINT_BUFFER_TRANSFER 1
 #define PRINT_BUFFER_RELEASE 0
 
 #define PRINT_KERNEL_BEFORE_EXEC 1
@@ -29,12 +29,12 @@
  * Filters for kernel execution 
  ******************************/
 
-#define USE_ADVANCED_KERNEL_FILTER 1
+#define USE_ADVANCED_KERNEL_FILTER 0
 #define ENV__KERNEL_FILTER "LD_KERNEL_FILTER"
 
 #define FILTER_BY_KERNEL_EXEC_CPT 1
-#define KERNEL_EXEC_CPT_LOWER_BOUND 0
-#define KERNEL_EXEC_CPT_UPPER_BOUND 5
+#define KERNEL_EXEC_CPT_LOWER_BOUND 3
+#define KERNEL_EXEC_CPT_UPPER_BOUND 3
 
 #define FILTER_BY_KERNEL_NAME 0
 #define KERNEL_NAME_FILTER "crust_mantle_impl_kernel_forward"
@@ -44,20 +44,23 @@
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_PARAMS_TO_FILE 0
+#define PRINT_KERNEL_PARAMS_TO_FILE 1
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 0
+#define PRINT_KERNEL_ARG_FULL_BUFFER 1
 #define FULL_BUFFER_SIZE_LIMIT 0
 
 #define PARAM_FILE_DIRECTORY "kernel_test_data"
 #define ENV__PARAM_FILE_SUBDIR_PREFIX "LD_KERNEL_SUBDIR_PREFIX"
 #define PARAM_FILE_DIRECTORY_PERM 0777
 
+
+#define ENABLE_KERNEL_TESTING 1
+
 /******************************
  * MPI support                
  ******************************/
 
-#define WITH_MPI 1
+#define WITH_MPI 0
 #define ONLY_MPI_ROOT_OUTPUT 1
 
 /******************************
@@ -120,7 +123,7 @@ struct ld_kern_param_s {
   int has_current_value;
   struct ld_mem_s *current_buffer;
   size_t offset;
-  
+  size_t index;
   char current_value[CURRENT_VALUE_BUFFER_SZ];
   char current_binary_value[10];
 };
@@ -136,6 +139,12 @@ struct ld_kernel_s {
 #if ENABLE_KERNEL_PROFILING == 1
   unsigned long long int exec_span_ns;
 #endif
+};
+
+#define MAX_WORK_DIM 3
+struct work_size_s {
+  size_t local[MAX_WORK_DIM];
+  size_t global[MAX_WORK_DIM];
 };
 
 /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
@@ -160,6 +169,16 @@ void dbg_notify_event(void);
 struct callback_s {
   int (*getBufferContent) (struct ld_mem_s *ldBuffer, void *buffer,
                            size_t offset, size_t size);
+  void *(*setParameterValue) (struct ld_kernel_s *ldKernel,
+                              struct ld_kern_param_s *ldParam,
+                              void *buffer,  size_t size);
+  int (*getAndReleaseParameterValue) (struct ld_kernel_s *ldKernel,
+                                      struct ld_kern_param_s *ldParam,
+                                      void *buffer_handle,
+                                      void *buffer, size_t size);
+  int (*triggerKernelExecution) (struct ld_kernel_s *ldKernel,
+                                 const struct work_size_s *work_sizes,
+                                 unsigned int work_dim);
 };
 
 void debug(const char *format, ...);
@@ -254,11 +273,6 @@ static inline char *buffer_flag_to_direction(ld_flags flags) {
 #endif
 }
 
-struct work_size_s {
-  size_t local[3];
-  size_t global[3];
-};
-
 void init_ldchecker(struct callback_s callbacks, struct ld_bindings_s *lib_bindings);
 void buffer_created_event(struct ld_mem_s *buffer);
 void subbuffer_created_event(struct ld_mem_s *buffer, size_t offset);
@@ -279,7 +293,7 @@ void kernel_set_buffer_arg_event (struct ld_kernel_s *ldKernel,
                                   size_t offset);
 void kernel_executed_event(struct ld_kernel_s *kernel,
                            const struct work_size_s *work_sizes,
-                           int work_dim);
+                           unsigned int work_dim);
 void kernel_finished_event(struct ld_kernel_s *ldKernel,
                            const struct work_size_s *work_sizes,
                            int work_dim);
