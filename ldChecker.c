@@ -165,13 +165,30 @@ size_t get_fsize(FILE *fp) {
 }
 
 static
-int validate_buffer_content(const unsigned char *act_buffer, const unsigned char *ref_buffer, size_t sz) {
+int validate_buffer_content(const unsigned char *act_buffer, const unsigned char *ref_buffer,
+                            size_t sz, int is_float)
+{
   int i;
+  if (is_float) {
+    sz = sz / sizeof(float);
+  }
   for (i = 0; i < sz; i++) {
-    if (act_buffer[i] != ref_buffer[i]) {
-      return 0;
+    if (is_float) {
+      
+      float diff = ((float *) act_buffer)[i] - ((float *) ref_buffer)[i];
+
+      if (diff > 1e-8) {
+        printf("--diff@%d = %g\n", i, diff);
+        return 0;
+      }
+      
+    } else {
+      if (act_buffer[i] != ref_buffer[i]) {
+        return 0;
+      }
     }
   }
+
   return 1;
 }
 
@@ -197,8 +214,6 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
   if (!dp) {
     warning("No test data for kernel '%s'\n", ldKernel->name);
     return;
-  } else {
-    info("Test kernel '%s'\n", ldKernel->name);
   }
   
   while ((dir = readdir(dp))) {
@@ -284,7 +299,7 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
                                              act_buffer, sz);
       fread(ref_buffer, sizeof(char), sz, fp);
     
-      if (!validate_buffer_content(act_buffer, ref_buffer, sz)) {
+      if (!validate_buffer_content(act_buffer, ref_buffer, sz, ldParam->type_info->type == TYPE_INFO_FLOAT)) {
         valid = 0;
       }
     

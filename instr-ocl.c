@@ -676,7 +676,7 @@ struct ld_mem_s *readWriteMemory(cl_mem buffer, void **ptr, int direction,
 {
   struct ld_mem_s *ldBuffer = find_mem_entry(buffer);
   size_t real_offset = offset;
-  
+
   if (!ldBuffer) {
     struct ld_mem_offset_s *ldSubBuffer = find_mem_offset_entry(buffer);
 
