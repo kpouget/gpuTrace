@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include "ldChecker.h"
 
@@ -20,6 +21,12 @@
   sprintf(dirname, "%s/%s",                                             \
           PARAM_FILE_DIRECTORY,                                         \
           __kname__)
+
+#define SET_PARAMS_TO_FILE_DIR_RUN(__dirname__, __ldKernel__, __run__)  \
+  sprintf(__dirname__, "%s/%s/%s",                                      \
+          PARAM_FILE_DIRECTORY,                                         \
+          __ldKernel__->name,                                           \
+          __run__)
 
 #define SET_PARAMS_TO_FILE_DIR(__dirname__, __ldKernel__)       \
   sprintf(__dirname__, "%s/%s/%s%s%d",                          \
@@ -182,95 +189,107 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
   void **gpu_buffer_handles = malloc(sizeof(void *) * ldKernel->nb_params);
   struct work_size_s work_sizes;
   unsigned int work_dim;
+  unsigned int valid = 1;
   
-  // force it now, discover it next time
-  ldKernel->exec_counter = 3;
+  SET_PARAMS_TO_FILE_DIR_RUN(dirname, ldKernel, "");
+  DIR *dp = opendir(dirname);
+  struct dirent *dir;
   
-  SET_PARAMS_TO_FILE_DIR(dirname, ldKernel);
-  mkdir (dirname, PARAM_FILE_DIRECTORY_PERM);
-  sprintf(filename, "%s/problem_size", dirname);
 
-  fp = fopen(filename, "r");
-  getline (&line, &sz, fp); //  eg: <1,32><1,1>
-  {
-    int loc_glob, dim;
-    char *line_pos = line;
+  while ((dir = readdir(dp)) != NULL) {
+    const char *test_name =  dir->d_name;
+    SET_PARAMS_TO_FILE_DIR_RUN(dirname, ldKernel, test_name);
+    mkdir (dirname, PARAM_FILE_DIRECTORY_PERM);
+    sprintf(filename, "%s/problem_size", dirname);
     
-    for (loc_glob = 0; loc_glob < 2; loc_glob++) {
-      size_t *work_size = loc_glob == 0 ? work_sizes.local : work_sizes.global;
+    fp = fopen(filename, "r");
+    getline (&line, &sz, fp); //  eg: <1,32><1,1>
+    {
+      int loc_glob, dim;
+      char *line_pos = line;
+    
+      for (loc_glob = 0; loc_glob < 2; loc_glob++) {
+        size_t *work_size = loc_glob == 0 ? work_sizes.local : work_sizes.global;
       
-      line_pos++; // eat first '<'
-      dim = 0;
-      while (1) {
-        work_size[dim] = atoi(line_pos);
-        while (isdigit(*line_pos)) line_pos++; // eat 1 size
-        if (*line_pos == '>') {
-          line_pos++;
-          break; // cont to next dim
+        line_pos++; // eat first '<'
+        dim = 0;
+        while (1) {
+          work_size[dim] = atoi(line_pos);
+          while (isdigit(*line_pos)) line_pos++; // eat 1 size
+          if (*line_pos == '>') {
+            line_pos++;
+            break; // cont to next dim
+          }
+          assert(*line_pos == ',');
+          line_pos++; // eat the 'n'
+          dim++;
         }
-        assert(*line_pos == ',');
-        line_pos++; // eat the 'n'
-        dim++;
       }
+
+      work_dim = dim + 1;
     }
 
-    work_dim = dim;
-  }
-  
-  free(line);
-  fclose(fp);
-  
-  for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
-    struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
-    unsigned char *buffer;
-    
-    SET_PARAM_FILE_NAME(filename, dirname, ldParam, 0);
-    fp = fopen(filename, "r");
-    sz = get_fsize(fp);
-
-    buffer = malloc(sz);
-    fread(buffer, sizeof(char), sz, fp);
-    
-    /* check if buffer is correctly read */
-    
-    gpu_buffer_handles[arg_index] = _callbacks.setParameterValue(ldKernel, ldParam, buffer, sz);
-    
-    free(buffer);
+    free(line);
     fclose(fp);
-  }
-
-  _callbacks.triggerKernelExecution(ldKernel, &work_sizes, work_dim);
-
-  for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
-    struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
-    unsigned char *ref_buffer;
-    unsigned char *act_buffer;
+  
+    for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
+      struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
+      unsigned char *buffer;
     
-    SET_PARAM_FILE_NAME(filename, dirname, ldParam, 1);
-    fp = fopen(filename, "r");
-    warning("read from %s\n", filename);
-    if (!fp) {
-      continue;
+      SET_PARAM_FILE_NAME(filename, dirname, ldParam, 0);
+      fp = fopen(filename, "r");
+      sz = get_fsize(fp);
+
+      buffer = malloc(sz);
+      fread(buffer, sizeof(char), sz, fp);
+    
+      /* check if buffer is correctly read */
+    
+      gpu_buffer_handles[arg_index] = _callbacks.setParameterValue(ldKernel, ldParam, buffer, sz);
+    
+      free(buffer);
+      fclose(fp);
     }
-    
-    sz = get_fsize(fp);
 
-    ref_buffer = malloc(sz);
-    act_buffer = malloc(sz);
+    _callbacks.triggerKernelExecution(ldKernel, &work_sizes, work_dim);
+
+    for (arg_index = 0; arg_index < ldKernel->nb_params; arg_index++) {
+      struct ld_kern_param_s *ldParam = &ldKernel->params[arg_index];
+      unsigned char *ref_buffer;
+      unsigned char *act_buffer;
     
-    _callbacks.getAndReleaseParameterValue(ldKernel, ldParam, gpu_buffer_handles[arg_index],
-                                           act_buffer, sz);
-    fread(ref_buffer, sizeof(char), sz, fp);
+      SET_PARAM_FILE_NAME(filename, dirname, ldParam, 1);
+      fp = fopen(filename, "r");
+
+      if (!fp) {
+        continue;
+      }
     
-    if (!validate_buffer_content(act_buffer, ref_buffer, sz)) {
-      warning("Content of buffer %s doesn't match reference\n", ldParam->name);
+      sz = get_fsize(fp);
+
+      ref_buffer = malloc(sz);
+      act_buffer = malloc(sz);
+    
+      _callbacks.getAndReleaseParameterValue(ldKernel, ldParam, gpu_buffer_handles[arg_index],
+                                             act_buffer, sz);
+      fread(ref_buffer, sizeof(char), sz, fp);
+    
+      if (!validate_buffer_content(act_buffer, ref_buffer, sz)) {
+        valid = 0;
+      }
+    
+      free(ref_buffer);
+      free(act_buffer);
+      fclose(fp);
+    }
+
+
+    if (!valid) {
+      warning("Kernel %s (test data #%s) doesn't match reference dataset\n", ldKernel->name, test_name);
     } else {
-      warning("Content of buffer %s seems good :-)\n", ldParam->name);
+      warning("Kernel %s (test data #%s) seems good :)\n", ldKernel->name, test_name);
     }
-    
-    free(ref_buffer);
-    free(act_buffer);
-    fclose(fp);
+    break;
   }
   
   free(gpu_buffer_handles);

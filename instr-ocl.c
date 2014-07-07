@@ -488,8 +488,6 @@ void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
     buffer = &mem_obj;
     size = sizeof(cl_mem);
   }
-    
-  warning("set param %s to %p\n", ldParam->name, *(char *) buffer);
 
   clCheck(real_clSetKernelArg ((cl_kernel) ldKernel->handle, ldParam->index,
                                size, buffer));
@@ -503,11 +501,11 @@ int ocl_triggerKernelExecution (struct ld_kernel_s *ldKernel,
                                 unsigned int work_dim)
 {
   static size_t global_work_size[MAX_WORK_DIM], local_work_size[MAX_WORK_DIM];
-  int i;
-
+  unsigned int i;
+  
   for (i = 0; i < work_dim; i++) {
     local_work_size[i] = work_sizes->local[i];
-    global_work_size[i] = work_sizes->global[i]/work_sizes->local[i];
+    global_work_size[i] = work_sizes->global[i] * work_sizes->local[i];
   }
   
   clCheck(real_clEnqueueNDRangeKernel(ldOclEnv.command_queue, (cl_kernel) ldKernel->handle,

@@ -36,17 +36,17 @@
 #define KERNEL_EXEC_CPT_LOWER_BOUND 3
 #define KERNEL_EXEC_CPT_UPPER_BOUND 3
 
-#define FILTER_BY_KERNEL_NAME 0
-#define KERNEL_NAME_FILTER "crust_mantle_impl_kernel_forward"
+#define FILTER_BY_KERNEL_NAME 1
+#define KERNEL_NAME_FILTER "support_count"
 
 /******************************
  * Print full buffers to screen
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_PARAMS_TO_FILE 0
+#define PRINT_KERNEL_PARAMS_TO_FILE 1
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 0
+#define PRINT_KERNEL_ARG_FULL_BUFFER 1
 #define FULL_BUFFER_SIZE_LIMIT 0
 
 #define PARAM_FILE_DIRECTORY "kernel_test_data"
