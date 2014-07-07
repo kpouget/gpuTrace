@@ -169,7 +169,6 @@ int validate_buffer_content(const unsigned char *act_buffer, const unsigned char
   int i;
   for (i = 0; i < sz; i++) {
     if (act_buffer[i] != ref_buffer[i]) {
-      warning("error at %d\n", i);
       return 0;
     }
   }
@@ -179,8 +178,8 @@ int validate_buffer_content(const unsigned char *act_buffer, const unsigned char
 #define MAX_LINE_LENGTH 256
 static
 void kernel_run_tests(struct ld_kernel_s *ldKernel) {
-  static char filename[80];
-  static char dirname[80];
+  static char filename[256];
+  static char dirname[256];
   
   char *line;
   FILE *fp;
@@ -195,9 +194,20 @@ void kernel_run_tests(struct ld_kernel_s *ldKernel) {
   DIR *dp = opendir(dirname);
   struct dirent *dir;
   
-
-  while ((dir = readdir(dp)) != NULL) {
+  if (!dp) {
+    warning("No test data for kernel '%s'\n", ldKernel->name);
+    return;
+  } else {
+    info("Test kernel '%s'\n", ldKernel->name);
+  }
+  
+  while ((dir = readdir(dp))) {
     const char *test_name =  dir->d_name;
+
+    if (dir->d_name[0] == '.') {
+      continue;
+    }
+    
     SET_PARAMS_TO_FILE_DIR_RUN(dirname, ldKernel, test_name);
     mkdir (dirname, PARAM_FILE_DIRECTORY_PERM);
     sprintf(filename, "%s/problem_size", dirname);
@@ -509,7 +519,7 @@ void print_full_buffer(struct ld_kernel_s *ldKernel,
   void *buffer;
   char *ptr;
 
-  if (ldBuffer->released || !ldBuffer->has_values) {
+  if (ldBuffer->released) {
     size = 0;
   }
 

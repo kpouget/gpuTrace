@@ -29,7 +29,7 @@
  * Filters for kernel execution 
  ******************************/
 
-#define USE_ADVANCED_KERNEL_FILTER 0
+#define USE_ADVANCED_KERNEL_FILTER 1
 #define ENV__KERNEL_FILTER "LD_KERNEL_FILTER"
 
 #define FILTER_BY_KERNEL_EXEC_CPT 1
@@ -44,15 +44,14 @@
  * or into a file.                   
  ******************************/
 
-#define PRINT_KERNEL_PARAMS_TO_FILE 1
+#define PRINT_KERNEL_PARAMS_TO_FILE 0
 
-#define PRINT_KERNEL_ARG_FULL_BUFFER 1
+#define PRINT_KERNEL_ARG_FULL_BUFFER 0
 #define FULL_BUFFER_SIZE_LIMIT 0
 
 #define PARAM_FILE_DIRECTORY "kernel_test_data"
 #define ENV__PARAM_FILE_SUBDIR_PREFIX "LD_KERNEL_SUBDIR_PREFIX"
 #define PARAM_FILE_DIRECTORY_PERM 0777
-
 
 #define ENABLE_KERNEL_TESTING 1
 

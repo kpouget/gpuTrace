@@ -11,8 +11,8 @@ SERGE_OCL_APPLI := ./AprioriPBI src/chess.dat 3000
 SPECFEM_OCL_DIR := /home/kevin/final/async.ocl/ #/home/kevin/travail/sample/specfem-build
 SPECFEM_OCL_APPLI := bin/xspecfem3D
 
-OCL_DIR := $(SERGE_OCL_DIR)
-OCL_APPLI := $(SERGE_OCL_APPLI)
+OCL_DIR := $(SPECFEM_OCL_DIR)
+OCL_APPLI := $(SPECFEM_OCL_APPLI)
 
 LD_PRELOAD_ENV := $(shell make get_env_preload)
 

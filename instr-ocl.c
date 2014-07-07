@@ -20,11 +20,9 @@ static int mocl_errcode;
 static inline cl_int _clCheck(cl_int errcode, const char *file, int line, const char *func) {
   mocl_errcode = errcode;
   if (mocl_errcode != CL_SUCCESS) {
-    fprintf (stderr, "Error %d/%s at %s:%d %s\n", mocl_errcode,
-             clewErrorString(mocl_errcode),
-             file, line, func);
-    fflush(NULL);
-    exit(1);
+    error ("%d/%s at %s:%d %s\n", mocl_errcode,
+           clewErrorString(mocl_errcode),
+           file, line, func);
   }
   return errcode;
 }
@@ -454,12 +452,15 @@ cl_int clReleaseKernel (cl_kernel kernel) {
 
 /* ************************************************************************* */
 
+#define DEFAULT_SIZE(size) if (!size) size = 4;
+
 int ocl_getBufferContent (struct ld_mem_s *ldBuffer, void *buffer,
                           size_t offset, size_t size)
 {
   if (size == 0) {
     return 1;
   }
+  
   //debug("*** Read %zub from buffer #%d at +%zub *** \n", size, ldBuffer->uid, offset);
   cl_int err = real_clEnqueueReadBuffer(ldOclEnv.command_queue,
                                         ldBuffer->handle, CL_TRUE,
@@ -478,6 +479,8 @@ void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
   cl_int errcode_ret;
 
   if (ldParam->is_pointer) {
+    DEFAULT_SIZE(size)
+    
     mem_obj = real_clCreateBuffer(ldOclEnv.context, CL_MEM_READ_WRITE, size, NULL, clck_(&errcode_ret));
 
     clCheck(real_clEnqueueWriteBuffer(ldOclEnv.command_queue,
@@ -489,6 +492,16 @@ void *ocl_setParameterValue (struct ld_kernel_s *ldKernel,
     size = sizeof(cl_mem);
   }
 
+  if (size == 0 && strstr(ldParam->name, "_tex")) {
+    cl_image_format format = {CL_R, CL_UNSIGNED_INT32};
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    mem_obj = clCreateImage2D (ldOclEnv.context, CL_MEM_READ_ONLY, &format, 100, 1, 0, &format, clck_(&errcode_ret));
+#pragma GCC diagnostic pop
+    buffer = &mem_obj;
+    size = sizeof(cl_mem);
+  }
+  
   clCheck(real_clSetKernelArg ((cl_kernel) ldKernel->handle, ldParam->index,
                                size, buffer));
 
@@ -524,13 +537,17 @@ int ocl_getAndReleaseParameterValue (struct ld_kernel_s *ldKernel,
   if (buffer_handle == (void *) -1) {
     return 1;
   }
-
+  
+  if (size == 0) {
+    goto do_release;
+  }
+  
   clCheck(real_clEnqueueReadBuffer(ldOclEnv.command_queue,
                                    (cl_mem) buffer_handle,
                                    CL_TRUE,
                                    0, size, buffer,
                                    0, NULL, NULL));
-  
+do_release:
   clCheck(real_clReleaseMemObject((cl_mem) buffer_handle));
   
   return 1;
