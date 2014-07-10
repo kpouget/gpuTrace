@@ -633,6 +633,10 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue,
   int i;
   cl_int errcode;
 
+  if (num_events_in_wait_list) {
+    clCheck(clWaitForEvents(num_events_in_wait_list, event_wait_list));
+  }
+  
   assert(ldKernel);
   for (i = 0; i < work_dim; i++) {
     work_sizes.local[i] = local_work_size[i];

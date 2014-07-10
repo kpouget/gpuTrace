@@ -23,7 +23,7 @@
 
 #define BUFFER_ZERO_IS_NULL 0
 
-#define FORCE_FINISH_KERNEL 0
+#define FORCE_FINISH_KERNEL 1
 
 /******************************
  * Filters for kernel execution 
@@ -33,11 +33,11 @@
 #define ENV__KERNEL_FILTER "LD_KERNEL_FILTER"
 
 #define FILTER_BY_KERNEL_EXEC_CPT 1
-#define KERNEL_EXEC_CPT_LOWER_BOUND 3
-#define KERNEL_EXEC_CPT_UPPER_BOUND 3
+#define KERNEL_EXEC_CPT_LOWER_BOUND 999
+#define KERNEL_EXEC_CPT_UPPER_BOUND 999
 
 #define FILTER_BY_KERNEL_NAME 1
-#define KERNEL_NAME_FILTER "support_count"
+#define KERNEL_NAME_FILTER "write_seismograms_transfer_from_device_kernel"
 
 /******************************
  * Print full buffers to screen

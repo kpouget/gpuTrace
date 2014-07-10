@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <dirent.h>
-
+#include <math.h>
 #include "ldChecker.h"
 
 #define __USE_GNU
@@ -172,14 +172,15 @@ int validate_buffer_content(const unsigned char *act_buffer, const unsigned char
   if (is_float) {
     sz = sz / sizeof(float);
   }
+
+  float max_diff = 0;
   for (i = 0; i < sz; i++) {
     if (is_float) {
       
       float diff = ((float *) act_buffer)[i] - ((float *) ref_buffer)[i];
-
-      if (diff > 1e-8) {
-        printf("--diff@%d = %g\n", i, diff);
-        return 0;
+      
+      if (fabsf(diff) > fabsf(max_diff)) {
+        max_diff = diff;
       }
       
     } else {
@@ -188,7 +189,13 @@ int validate_buffer_content(const unsigned char *act_buffer, const unsigned char
       }
     }
   }
-
+  if (is_float) {
+    if (max_diff != 0) {
+      printf("max diff = %g\n", max_diff);
+      return 0;
+    }
+  }
+  
   return 1;
 }
 
@@ -488,8 +495,8 @@ finish:
 #if PRINT_KERNEL_PARAMS_TO_FILE == 1
 static
 void print_kernel_problem_to_file(struct ld_kernel_s *ldKernel,
-                                         const struct work_size_s *work_sizes,
-                                         int work_dim)
+                                  const struct work_size_s *work_sizes,
+                                  int work_dim)
 {
   static char filename[80];
   static char dirname[80];
@@ -793,9 +800,8 @@ void kernel_executed_event(struct ld_kernel_s *ldKernel,
                            unsigned int work_dim)
 {
   int i;
-  
   ldKernel->exec_counter++;
-  
+  error("quit\n");
 #if PRINT_KERNEL_BEFORE_EXEC == 1
   kernel_print_current_parameters(ldKernel, work_sizes, work_dim, 0);
 #endif
