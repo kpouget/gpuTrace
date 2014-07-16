@@ -43,7 +43,7 @@ endif
 all : $(SO_NAME)
 
 $(SO_NAME) : $(GPU_INSTR) gpu_helper_py.o ldChecker.o 
-	gcc -o $@ $^ $(SO_LDFLAGS)
+	gcc -o $@ $^ $(SO_LDFLAGS) -lpython3.3m
 
 gpu_helper_py.o : gpu_helper_py.c $(HELPER_HEADER)
 	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS)

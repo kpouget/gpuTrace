@@ -801,7 +801,7 @@ void kernel_executed_event(struct ld_kernel_s *ldKernel,
 {
   int i;
   ldKernel->exec_counter++;
-  error("quit\n");
+  //error("quit\n");
 #if PRINT_KERNEL_BEFORE_EXEC == 1
   kernel_print_current_parameters(ldKernel, work_sizes, work_dim, 0);
 #endif

@@ -4,6 +4,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+
+/******************************
+ * Configuration
+ ******************************/
+
+#define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 1
+
+#define BUFFER_ZERO_IS_NULL 0
+
+#define FORCE_FINISH_KERNEL 1
+
+
 /******************************
  * Select what and when info 
  * are traced.
@@ -18,12 +30,6 @@
 #define PRINT_KERNEL_AFTER_EXEC 1
 #define PRINT_KERNEL_AFTER_EXEC_IGNORE_CONST 0
 #define PRINT_KERNEL_NAME_ONLY 0
-
-#define PRINT_BUFFER_TRANSFER_FIRST_BYTES_AS_FLOAT 1
-
-#define BUFFER_ZERO_IS_NULL 0
-
-#define FORCE_FINISH_KERNEL 1
 
 /******************************
  * Filters for kernel execution 
