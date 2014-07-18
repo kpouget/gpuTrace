@@ -13,8 +13,8 @@ SO_NAME := ldChecker.so
 
 MPI_INC := -I/usr/include/openmpi-x86_64/ -I/usr/lib/openmpi/include
 
-PY_CFLAGS := $(python3-config --cflags) -DPYTHON_MOD_PATH=$(shell pwd)
-PY_LDFLAGS := $(python3-config --ldflags)
+PY_CFLAGS := $(shell python3-config --includes) -DPYTHON_MOD_PATH=$(shell pwd)
+PY_LDFLAGS := $(shell python3-config --libs)
 
 SO_CFLAGS := -fPIC 
 SO_LDFLAGS := -fPIC -rdynamic -shared  $(PY_LDFLAGS) 
