@@ -43,7 +43,7 @@ endif
 all : $(SO_NAME)
 
 $(SO_NAME) : $(GPU_INSTR) gpu_helper_py.o ldChecker.o 
-	gcc -o $@ $^ $(SO_LDFLAGS) -lpython3.3m
+	gcc -o $@ $^ $(SO_LDFLAGS) 
 
 gpu_helper_py.o : gpu_helper_py.c $(HELPER_HEADER)
 	gcc -o $@ -c $< $(CFLAGS) $(PY_CFLAGS)
@@ -58,7 +58,7 @@ clean-python :
 	rm -rf __pycache__
 
 get_env_preload :
-	@echo LD_PRELOAD=$(shell pwd)/$(SO_NAME):libpython3.3m.so
+	@echo LD_PRELOAD=$(shell pwd)/$(SO_NAME)
 
 ################
 ### OpenCL  ####

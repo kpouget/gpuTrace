@@ -619,8 +619,8 @@ int skip_kernel_printing(struct ld_kernel_s *ldKernel) {
     if (adv_kernel_filter) {
       int i;
       char *s = adv_kernel_filter;
-      for (i = 0; *s; i += *s == ':', s++);
-      nb_filters = i;
+      for (i = 0; *s; i += (*s == ':'), s++);
+      nb_filters = i + 1; // leave space for NULL termination
     }
     
     kfilters = malloc (sizeof (struct kernel_filter_s) * (nb_filters + 1));

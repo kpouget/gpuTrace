@@ -59,7 +59,7 @@
 #define ENV__PARAM_FILE_SUBDIR_PREFIX "LD_KERNEL_SUBDIR_PREFIX"
 #define PARAM_FILE_DIRECTORY_PERM 0777
 
-#define ENABLE_KERNEL_TESTING 1
+#define ENABLE_KERNEL_TESTING 0
 
 /******************************
  * MPI support                
